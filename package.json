@@ -1,5 +1,5 @@
 {
-  "name": "@textshq/platform-openai",
+  "name": "@textshq/platform-openai-user",
   "version": "0.1.0",
   "main": "./dist/index.js",
   "files": [
