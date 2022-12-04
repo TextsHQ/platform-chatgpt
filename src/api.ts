@@ -89,8 +89,7 @@ export default class OpenAI implements PlatformAPI {
 
   login = async ({ cookieJarJSON }): Promise<LoginResult> => {
     if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
-    this.jar = CookieJar.fromJSON(cookieJarJSON as any)
-    // await this.afterAuth()
+    this.jar = CookieJar.fromJSON(cookieJarJSON)
     return { type: 'success' }
   }
 
