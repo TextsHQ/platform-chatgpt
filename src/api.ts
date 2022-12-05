@@ -205,6 +205,14 @@ export default class OpenAI implements PlatformAPI {
       if (!response.headers['content-type'].includes('text/event-stream')) {
         texts.log(response.statusCode, string)
         const json = string.startsWith('<') ? string : JSON.parse(string)
+        const msg: Message = {
+          id: randomUUID(),
+          timestamp: new Date(),
+          text: json.detail?.message ?? json.detail ?? string,
+          isAction: true,
+          senderID: 'none',
+        }
+        if (typeof msg.text !== 'string') msg.text = string
         this.pushEvent([{
           type: ServerEventType.USER_ACTIVITY,
           activityType: ActivityType.NONE,
@@ -215,13 +223,7 @@ export default class OpenAI implements PlatformAPI {
           objectName: 'message',
           mutationType: 'upsert',
           objectIDs: { threadID },
-          entries: [{
-            id: randomUUID(),
-            timestamp: new Date(),
-            text: json.detail ?? string,
-            isAction: true,
-            senderID: 'none',
-          } satisfies Message],
+          entries: [msg],
         }])
         return
       }
