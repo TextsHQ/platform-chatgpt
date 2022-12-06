@@ -41,6 +41,18 @@ function parseTextAttributes(text: string): TextAttributes {
   return { entities }
 }
 
+const headers = {
+  accept: '*/*',
+  'accept-language': 'en',
+  'sec-ch-ua': '"Not?A_Brand";v="8", "Chromium";v="108", "Google Chrome";v="108"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"macOS"',
+  'sec-fetch-dest': 'empty',
+  'sec-fetch-mode': 'cors',
+  'sec-fetch-site': 'same-origin',
+  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
+}
+
 export default class OpenAI implements PlatformAPI {
   private currentUser: CurrentUser
 
@@ -101,7 +113,15 @@ export default class OpenAI implements PlatformAPI {
 
   private fetchSession = async (refreshing = false) => {
     texts.log('fetching session', { refreshing })
-    const res = await this.http.requestAsString(`${ENDPOINT}api/auth/session`, { cookieJar: this.jar })
+    const res = await this.http.requestAsString(`${ENDPOINT}api/auth/session`, {
+      headers,
+      cookieJar: this.jar,
+    })
+    if (res.body[0] === '<') {
+      console.log(res.statusCode, res.body)
+      const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(res.body) || []
+      throw Error(`expected json, got html, status code=${res.statusCode}, title=${title}`)
+    }
     const json = JSON.parse(res.body)
     texts.log(json)
     const { user, accessToken, expires } = json
