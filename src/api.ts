@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { orderBy } from 'lodash'
 import { CookieJar } from 'tough-cookie'
-import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, MessageID, TextAttributes, TextEntity, MessageBehavior } from '@textshq/platform-sdk'
+import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, MessageID, TextAttributes, TextEntity, MessageBehavior, ReAuthError } from '@textshq/platform-sdk'
 import { tryParseJSON } from '@textshq/platform-sdk/dist/json'
 import type { IncomingMessage } from 'http'
 import type { EventEmitter } from 'stream'
@@ -124,7 +124,7 @@ export default class OpenAI implements PlatformAPI {
     }
     const json = JSON.parse(res.body)
     texts.log(json)
-    const { user, accessToken, expires } = json
+    const { user, accessToken, expires, error } = json
     this.accessToken = accessToken
     this.currentUser = {
       id: user.id,
@@ -133,6 +133,7 @@ export default class OpenAI implements PlatformAPI {
       imgURL: user.image,
       displayText: user.name,
     }
+    if (error === 'RefreshAccessTokenError') throw new ReAuthError()
     // const dist = new Date(expires).getTime() - Date.now()
     // console.log(new Date(expires), dist)
     // setTimeout(this.fetchSession, new Date(expires).getTime() - Date.now(), true)
@@ -222,8 +223,10 @@ export default class OpenAI implements PlatformAPI {
       const string = chunk.toString()
       // texts.log(string)
       if (string === '[DONE]') return
-      if (!response.headers['content-type'].includes('text/event-stream')) {
-        texts.log(response.statusCode, string)
+      const ct = response.headers['content-type']
+      if (!ct.includes('text/event-stream')) {
+        // 401 application/json {"detail":{"message":"Your authentication token has expired. Please try signing in again.","type":"invalid_request_error","param":null,"code":"token_expired"}}
+        texts.log(response.statusCode, ct, string)
         const json = string.startsWith('<') ? string : JSON.parse(string)
         const msg: Message = {
           id: randomUUID(),
