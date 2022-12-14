@@ -1,10 +1,10 @@
 import { randomUUID } from 'crypto'
 import { orderBy } from 'lodash'
-import { CookieJar } from 'tough-cookie'
-import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, MessageID, TextAttributes, TextEntity, MessageBehavior, ReAuthError } from '@textshq/platform-sdk'
+import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, MessageID, TextAttributes, TextEntity, MessageBehavior } from '@textshq/platform-sdk'
 import { tryParseJSON } from '@textshq/platform-sdk/dist/json'
 import type { IncomingMessage } from 'http'
 import type { EventEmitter } from 'stream'
+import { ChatGPTAPI } from 'chatgpt'
 
 const ENDPOINT = 'https://chat.openai.com/'
 
@@ -45,9 +45,11 @@ const { USER_AGENT } = texts.constants // User agent should match the user agent
 
 const defaultHeaders = {
   accept: '*/*',
-  'accept-language': 'en',
+  'accept-language': 'en-US,en;q=0.9',
   'sec-ch-ua': '"Not?A_Brand";v="8", "Chromium";v="108", "Google Chrome";v="108"',
-  'sec-ch-ua-mobile': '?0',
+  'x-openai-assistant-app-id': '',
+  origin: 'https://chat.openai.com',
+  referer: 'https://chat.openai.com/chat',
   'sec-ch-ua-platform': '"macOS"',
   'sec-fetch-dest': 'empty',
   'sec-fetch-mode': 'cors',
@@ -57,8 +59,6 @@ const defaultHeaders = {
 
 export default class OpenAI implements PlatformAPI {
   private currentUser: CurrentUser
-
-  private accessToken: string
 
   private genThread = () => {
     const t: Thread = {
@@ -87,11 +87,15 @@ export default class OpenAI implements PlatformAPI {
     return t
   }
 
-  private jar: CookieJar
+  private chatgpt: ChatGPTAPI
+
+  private sessionToken: string
+
+  private clearanceToken: string
+
+  private userAgent: string
 
   private headers: Record<string, string> = { ...defaultHeaders }
-
-  private http = texts.createHttpClient()
 
   private messages = new Map<MessageID, Message>()
 
@@ -100,55 +104,58 @@ export default class OpenAI implements PlatformAPI {
   private pushEvent: OnServerEventCallback
 
   init = (session: SerializedSession) => {
-    if (session) this.jar = CookieJar.fromJSON(session)
+    if (session?.userAgent) this.userAgent = session.userAgent
+    if (session?.sessionToken) this.sessionToken = session.sessionToken
+    if (session?.clearanceToken) this.clearanceToken = session.clearanceToken
+    this.setupChatGPT()
   }
 
   login = async ({ cookieJarJSON, jsCodeResult }): Promise<LoginResult> => {
     if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
-    this.jar = CookieJar.fromJSON(cookieJarJSON)
-    if (jsCodeResult && jsCodeResult.ua) {
-      this.headers['user-agent'] = jsCodeResult.ua
-    }
+    const cookies = JSON.parse(cookieJarJSON).reduce(
+      (map, cookie) => ({ ...map, [cookie.name]: cookie }),
+      {},
+    )
+
+    this.userAgent = jsCodeResult.ua
+    this.sessionToken = cookies['__Secure-next-auth.session-token']?.value
+    this.clearanceToken = cookies.cf_clearance?.value
+    // this.cookies = cookies
+
+    this.setupChatGPT()
+
     return { type: 'success' }
   }
 
-  serializeSession = () => this.jar.toJSON()
+  serializeSession = () => ({
+    sessionToken: this.sessionToken,
+    clearanceToken: this.clearanceToken,
+    userAgent: this.userAgent,
+    headers: this.headers,
+  })
 
   logout = () => {}
 
   dispose = () => {}
 
-  private fetchSession = async (refreshing = false) => {
-    texts.log('fetching session', { refreshing })
-    const res = await this.http.requestAsString(`${ENDPOINT}api/auth/session`, {
+  private setupChatGPT = async () => {
+    this.chatgpt = new ChatGPTAPI({
+      sessionToken: this.sessionToken,
+      clearanceToken: this.clearanceToken,
+      userAgent: this.userAgent,
       headers: this.headers,
-      cookieJar: this.jar,
+      debug: texts.isLoggingEnabled,
     })
-    if (res.body[0] === '<') {
-      console.log(res.statusCode, res.body)
-      const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(res.body) || []
-      throw Error(`expected json, got html, status code=${res.statusCode}, title=${title}`)
-    }
-    const json = JSON.parse(res.body)
-    texts.log(json)
-    const { user, accessToken, expires, error } = json
-    this.accessToken = accessToken
-    this.currentUser = {
-      id: user.id,
-      fullName: user.name,
-      email: user.email,
-      imgURL: user.image,
-      displayText: user.name,
-    }
-    if (error === 'RefreshAccessTokenError') throw new ReAuthError()
-    // const dist = new Date(expires).getTime() - Date.now()
-    // console.log(new Date(expires), dist)
-    // setTimeout(this.fetchSession, new Date(expires).getTime() - Date.now(), true)
+    await this.chatgpt.ensureAuth()
   }
 
   getCurrentUser = async (): Promise<CurrentUser> => {
-    await this.fetchSession()
-    return this.currentUser
+    if (!this.chatgpt.user) return
+    const { id, name, email } = this.chatgpt.user
+    return {
+      id,
+      displayText: name + (email ? ` (${email})` : ''),
+    }
   }
 
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
@@ -202,98 +209,67 @@ export default class OpenAI implements PlatformAPI {
       participantID: 'chatgpt',
       durationMs: 30_000,
     }])
-    const stream = await texts.fetchStream(`${ENDPOINT}backend-api/conversation`, {
-      method: 'POST',
-      cookieJar: this.jar,
-      headers: {
-        Accept: 'text/event-stream',
-        'Accept-Language': 'en',
-        Authorization: `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
-        'x-openai-assistant-app-id': '',
-        'user-agent': texts.constants.USER_AGENT,
-        ...this.headers,
-      },
-      body: JSON.stringify({
+    const response = await this.chatgpt.sendMessage(content.text, {
+      // conversationId: this.convID,
+      parentMessageId: [...this.messages.values()].at(-1)?.id || randomUUID(),
+    })
+    texts.log('chatgpt', 'response', response)
+    console.log('chatgpt', 'response', response)
+    /*
+ body: JSON.stringify({
         action: 'next',
         conversation_id: this.convID,
         messages: [{ id: options.pendingMessageID, role: 'user', content: { content_type: 'text', parts: [content.text] } }],
         model: 'text-davinci-002-render',
         parent_message_id: [...this.messages.values()].at(-1)?.id || randomUUID(),
       }),
-    })
+      */
     this.messages.set(userMessage.id, userMessage)
-    let response: IncomingMessage
-    (stream as EventEmitter).on('response', (res: IncomingMessage) => {
-      response = res
-    })
-    stream.on('data', (chunk: Buffer) => {
-      const string = chunk.toString()
-      // texts.log(string)
-      if (string === '[DONE]') return
-      const ct = response.headers['content-type']
-      if (!ct.includes('text/event-stream')) {
-        // 401 application/json {"detail":{"message":"Your authentication token has expired. Please try signing in again.","type":"invalid_request_error","param":null,"code":"token_expired"}}
-        texts.log(response.statusCode, ct, string)
-        const json = string.startsWith('<') ? string : JSON.parse(string)
-        const msg: Message = {
-          id: randomUUID(),
-          timestamp: new Date(),
-          text: json.detail?.message ?? json.detail ?? string,
-          isAction: true,
-          senderID: 'none',
-        }
-        if (typeof msg.text !== 'string') msg.text = string
-        this.pushEvent([{
-          type: ServerEventType.USER_ACTIVITY,
-          activityType: ActivityType.NONE,
-          threadID,
-          participantID: 'chatgpt',
-        }, {
-          type: ServerEventType.STATE_SYNC,
-          objectName: 'message',
-          mutationType: 'upsert',
-          objectIDs: { threadID },
-          entries: [msg],
-        }])
-        return
-      }
-      const parsed = string
-        .split('data: ')
-        .map(l => l.trim())
-        .filter(Boolean)
-        .map(l => tryParseJSON(l))
-        .filter(Boolean)
-      if (parsed[0]) this.convID = parsed[0].conversation_id
-      const timestamp = new Date()
-      const entries = parsed.map<Message>(m => {
-        const text = m.message.content?.parts.join('\n')
-        return {
-          _original: JSON.stringify(m),
-          id: m.message.id,
-          senderID: 'chatgpt',
-          text: m.message.content?.parts.join('\n'),
-          textAttributes: parseTextAttributes(text),
-          timestamp,
-          behavior: MessageBehavior.DONT_NOTIFY,
-        }
-      }).filter(m => m.text)
-      if (!entries.length) return
-      this.pushEvent([{
-        type: ServerEventType.STATE_SYNC,
-        objectName: 'message',
-        mutationType: 'upsert',
-        objectIDs: { threadID },
-        entries,
-      }])
-      entries.forEach(e => {
-        this.messages.set(e.id, e)
-      })
-    })
-    stream.on('end', (chunk: Buffer) => {
-      const string = chunk?.toString()
-      // texts.log('end', string)
-    })
+    const msg: Message = {
+      id: randomUUID(),
+      timestamp: new Date(),
+      text: response,
+      isAction: true,
+      senderID: 'none',
+    }
+    this.pushEvent([{
+      type: ServerEventType.USER_ACTIVITY,
+      activityType: ActivityType.NONE,
+      threadID,
+      participantID: 'chatgpt',
+    }, {
+      type: ServerEventType.STATE_SYNC,
+      objectName: 'message',
+      mutationType: 'upsert',
+      objectIDs: { threadID },
+      entries: [msg],
+    }])
+    // if (parsed[0]) this.convID = parsed[0].conversation_id
+    const timestamp = new Date()
+    // const entries = parsed.map<Message>(m => {
+    //   const text = m.message.content?.parts.join('\n')
+    //   return {
+    //     _original: JSON.stringify(m),
+    //     id: m.message.id,
+    //     senderID: 'chatgpt',
+    //     text: m.message.content?.parts.join('\n'),
+    //     textAttributes: parseTextAttributes(text),
+    //     timestamp,
+    //     behavior: MessageBehavior.DONT_NOTIFY,
+    //   }
+    // }).filter(m => m.text)
+    // if (!entries.length) return
+    // this.pushEvent([{
+    //   type: ServerEventType.STATE_SYNC,
+    //   objectName: 'message',
+    //   mutationType: 'upsert',
+    //   objectIDs: { threadID },
+    //   entries: [],
+    // }])
+    // entries.forEach(e => {
+    //   this.messages.set(e.id, e)
+    // })
+
     return [userMessage]
   }
 
