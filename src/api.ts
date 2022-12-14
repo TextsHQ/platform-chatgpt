@@ -41,7 +41,9 @@ function parseTextAttributes(text: string): TextAttributes {
   return { entities }
 }
 
-const headers = {
+const { USER_AGENT } = texts.constants // User agent should match the user agent of the session to trick CloudFlare
+
+const defaultHeaders = {
   accept: '*/*',
   'accept-language': 'en',
   'sec-ch-ua': '"Not?A_Brand";v="8", "Chromium";v="108", "Google Chrome";v="108"',
@@ -50,7 +52,7 @@ const headers = {
   'sec-fetch-dest': 'empty',
   'sec-fetch-mode': 'cors',
   'sec-fetch-site': 'same-origin',
-  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
+  'user-agent': USER_AGENT,
 }
 
 export default class OpenAI implements PlatformAPI {
@@ -87,6 +89,8 @@ export default class OpenAI implements PlatformAPI {
 
   private jar: CookieJar
 
+  private headers: Record<string, string> = { ...defaultHeaders }
+
   private http = texts.createHttpClient()
 
   private messages = new Map<MessageID, Message>()
@@ -99,9 +103,12 @@ export default class OpenAI implements PlatformAPI {
     if (session) this.jar = CookieJar.fromJSON(session)
   }
 
-  login = async ({ cookieJarJSON }): Promise<LoginResult> => {
+  login = async ({ cookieJarJSON, jsCodeResult }): Promise<LoginResult> => {
     if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
     this.jar = CookieJar.fromJSON(cookieJarJSON)
+    if (jsCodeResult && jsCodeResult.ua) {
+      this.headers['user-agent'] = jsCodeResult.ua
+    }
     return { type: 'success' }
   }
 
@@ -114,7 +121,7 @@ export default class OpenAI implements PlatformAPI {
   private fetchSession = async (refreshing = false) => {
     texts.log('fetching session', { refreshing })
     const res = await this.http.requestAsString(`${ENDPOINT}api/auth/session`, {
-      headers,
+      headers: this.headers,
       cookieJar: this.jar,
     })
     if (res.body[0] === '<') {
@@ -204,7 +211,8 @@ export default class OpenAI implements PlatformAPI {
         Authorization: `Bearer ${this.accessToken}`,
         'Content-Type': 'application/json',
         'x-openai-assistant-app-id': '',
-        'User-Agent': texts.constants.USER_AGENT,
+        'user-agent': texts.constants.USER_AGENT,
+        ...this.headers,
       },
       body: JSON.stringify({
         action: 'next',
