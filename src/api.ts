@@ -100,7 +100,10 @@ export default class OpenAI implements PlatformAPI {
   private pushEvent: OnServerEventCallback
 
   init = (session: SerializedSession) => {
-    if (session) this.jar = CookieJar.fromJSON(session)
+    if (!session) return
+    const { jar, ua } = session
+    this.jar = CookieJar.fromJSON(jar)
+    this.ua = ua
   }
 
   login = async ({ cookieJarJSON, jsCodeResult }): Promise<LoginResult> => {
@@ -113,7 +116,10 @@ export default class OpenAI implements PlatformAPI {
     return { type: 'success' }
   }
 
-  serializeSession = () => this.jar.toJSON()
+  serializeSession = () => ({
+    jar: this.jar.toJSON(),
+    ua: this.ua,
+  })
 
   logout = () => {}
 
