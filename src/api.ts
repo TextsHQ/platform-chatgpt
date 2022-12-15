@@ -41,18 +41,6 @@ function parseTextAttributes(text: string): TextAttributes {
   return { entities }
 }
 
-const headers = {
-  accept: '*/*',
-  'accept-language': 'en',
-  'sec-ch-ua': '"Not?A_Brand";v="8", "Chromium";v="108", "Google Chrome";v="108"',
-  'sec-ch-ua-mobile': '?0',
-  'sec-ch-ua-platform': '"macOS"',
-  'sec-fetch-dest': 'empty',
-  'sec-fetch-mode': 'cors',
-  'sec-fetch-site': 'same-origin',
-  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
-}
-
 export default class OpenAI implements PlatformAPI {
   private currentUser: CurrentUser
 
@@ -89,6 +77,22 @@ export default class OpenAI implements PlatformAPI {
 
   private http = texts.createHttpClient()
 
+  private ua = texts.constants.USER_AGENT
+
+  get headers() {
+    return {
+      accept: '*/*',
+      'accept-language': 'en',
+      'sec-ch-ua': '"Not?A_Brand";v="8", "Chromium";v="108", "Google Chrome";v="108"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"macOS"',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-origin',
+      'user-agent': this.ua,
+    }
+  }
+
   private messages = new Map<MessageID, Message>()
 
   private convID: string
@@ -99,7 +103,11 @@ export default class OpenAI implements PlatformAPI {
     if (session) this.jar = CookieJar.fromJSON(session)
   }
 
-  login = async ({ cookieJarJSON }): Promise<LoginResult> => {
+  login = async ({ cookieJarJSON, jsCodeResult }): Promise<LoginResult> => {
+    if (jsCodeResult) {
+      const { ua } = JSON.parse(jsCodeResult)
+      this.ua = ua
+    }
     if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
     this.jar = CookieJar.fromJSON(cookieJarJSON)
     return { type: 'success' }
@@ -114,7 +122,7 @@ export default class OpenAI implements PlatformAPI {
   private fetchSession = async (refreshing = false) => {
     texts.log('fetching session', { refreshing })
     const res = await this.http.requestAsString(`${ENDPOINT}api/auth/session`, {
-      headers,
+      headers: this.headers,
       cookieJar: this.jar,
     })
     if (res.body[0] === '<') {
@@ -195,16 +203,17 @@ export default class OpenAI implements PlatformAPI {
       participantID: 'chatgpt',
       durationMs: 30_000,
     }])
-    const stream = await texts.fetchStream(`${ENDPOINT}backend-api/conversation`, {
+    const url = `${ENDPOINT}backend-api/conversation`
+    const stream = await texts.fetchStream(url, {
       method: 'POST',
       cookieJar: this.jar,
       headers: {
+        ...this.headers,
         Accept: 'text/event-stream',
-        'Accept-Language': 'en',
         Authorization: `Bearer ${this.accessToken}`,
         'Content-Type': 'application/json',
         'x-openai-assistant-app-id': '',
-        'User-Agent': texts.constants.USER_AGENT,
+        Cookie: this.jar.getCookieStringSync(url),
       },
       body: JSON.stringify({
         action: 'next',
