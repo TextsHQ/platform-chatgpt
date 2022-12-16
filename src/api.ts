@@ -79,6 +79,8 @@ export default class OpenAI implements PlatformAPI {
 
   private ua = texts.constants.USER_AGENT
 
+  private authMethod: 'login-window' | 'extension' = 'login-window'
+
   get headers() {
     return {
       accept: '*/*',
@@ -101,15 +103,17 @@ export default class OpenAI implements PlatformAPI {
 
   init = (session: SerializedSession) => {
     if (!session) return
-    const { jar, ua } = session
+    const { jar, ua, authMethod } = session
     this.jar = CookieJar.fromJSON(jar)
     this.ua = ua
+    this.authMethod = authMethod
   }
 
   login = async ({ cookieJarJSON, jsCodeResult }): Promise<LoginResult> => {
     if (jsCodeResult) {
-      const { ua } = JSON.parse(jsCodeResult)
+      const { ua, authMethod } = JSON.parse(jsCodeResult)
       this.ua = ua
+      this.authMethod = authMethod || 'login-window'
     }
     if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
     this.jar = CookieJar.fromJSON(cookieJarJSON)
@@ -119,6 +123,7 @@ export default class OpenAI implements PlatformAPI {
   serializeSession = () => ({
     jar: this.jar.toJSON(),
     ua: this.ua,
+    authMethod: this.authMethod || 'login-window',
   })
 
   logout = () => {}
