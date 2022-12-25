@@ -79,22 +79,24 @@ export default class OpenAI implements PlatformAPI {
 
   private api = new OpenAIAPI()
 
-  init = (session: SerializedSession) => {
+  init = async (session: SerializedSession) => {
     if (!session) return
     const { jar, ua, authMethod } = session
     this.api.jar = CookieJar.fromJSON(jar)
     this.api.ua = ua
     this.api.authMethod = authMethod
+    await this.fetchSession()
   }
 
   login = async ({ cookieJarJSON, jsCodeResult }): Promise<LoginResult> => {
+    if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
     if (jsCodeResult) {
       const { ua, authMethod } = JSON.parse(jsCodeResult)
       this.api.ua = ua
       this.api.authMethod = authMethod || 'login-window'
     }
-    if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
     this.api.jar = CookieJar.fromJSON(cookieJarJSON)
+    await this.fetchSession()
     return { type: 'success' }
   }
 
@@ -125,10 +127,7 @@ export default class OpenAI implements PlatformAPI {
     // setTimeout(this.fetchSession, new Date(expires).getTime() - Date.now(), true)
   }
 
-  getCurrentUser = async (): Promise<CurrentUser> => {
-    await this.fetchSession()
-    return this.currentUser
-  }
+  getCurrentUser = () => this.currentUser
 
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
     this.pushEvent = onEvent

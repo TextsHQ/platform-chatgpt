@@ -60,6 +60,7 @@ export default class OpenAIAPI {
         'Content-Type': 'application/json',
         'x-openai-assistant-app-id': '',
         Cookie: this.jar.getCookieStringSync(url),
+        Referer: convID ? `https://chat.openai.com/chat/${convID}` : 'https://chat.openai.com/chat',
       },
       body: JSON.stringify({
         action: 'next',
