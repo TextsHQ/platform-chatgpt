@@ -13,7 +13,7 @@ const info: PlatformInfo = {
   icon,
   loginMode: 'browser',
   browserLogin: {
-    loginURL: 'https://chat.openai.com/',
+    url: 'https://chat.openai.com/',
     runJSOnLaunch: js,
     runJSOnNavigate: js,
   },
