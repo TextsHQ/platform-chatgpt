@@ -23,6 +23,7 @@ const info: PlatformInfo = {
     Attribute.NO_SUPPORT_SINGLE_THREAD_CREATION,
     Attribute.NO_SUPPORT_GROUP_THREAD_CREATION,
     Attribute.NO_SUPPORT_TYPING_INDICATOR,
+    Attribute.SUPPORTS_DELETE_THREAD,
   ]),
   attachments: {
     noSupport: true,

@@ -1,8 +1,9 @@
-import { texts } from '@textshq/platform-sdk'
+import { FetchOptions, texts } from '@textshq/platform-sdk'
 import type { CookieJar } from 'tough-cookie'
 
 const ENDPOINT = 'https://chat.openai.com/'
 
+const DEFAULT_MODEL = 'text-davinci-002-render'
 export default class OpenAIAPI {
   private http = texts.createHttpClient()
 
@@ -14,11 +15,18 @@ export default class OpenAIAPI {
 
   private accessToken: string
 
-  async fetchJSON(pathname: string) {
-    const res = await this.http.requestAsString(`${ENDPOINT}${pathname}`, {
-      headers: this.headers,
+  private async call(pathname: string, jsonBody?: any, optOverrides?: Partial<FetchOptions>) {
+    const opts: FetchOptions = {
+      body: jsonBody ? JSON.stringify(jsonBody) : undefined,
+      headers: {
+        ...(pathname.startsWith('backend-api') && { Authorization: `Bearer ${this.accessToken}` }),
+        ...(jsonBody && { 'Content-Type': 'application/json' }),
+        ...this.headers,
+      },
       cookieJar: this.jar,
-    })
+      ...optOverrides,
+    }
+    const res = await this.http.requestAsString(`${ENDPOINT}${pathname}`, opts)
     if (res.body[0] === '<') {
       console.log(res.statusCode, res.body)
       const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(res.body) || []
@@ -29,10 +37,24 @@ export default class OpenAIAPI {
   }
 
   async session() {
-    const json = await this.fetchJSON('api/auth/session')
+    const json = await this.call('api/auth/session')
     this.accessToken = json.accessToken
     return json
   }
+
+  models = () => this.call('backend-api/models')
+
+  conversations = (offset = 0, limit = 20) =>
+    this.call('backend-api/conversations', undefined, { searchParams: { offset, limit } })
+
+  conversation = (id: string) =>
+    this.call(`backend-api/conversation/${id}`)
+
+  patchConversation = (id: string, body: any) =>
+    this.call(`backend-api/conversation/${id}`, body, { method: 'PATCH' })
+
+  genTitle = (convID: string, messageID: string) =>
+    this.call(`backend-api/conversation/gen_title/${convID}`, { message_id: messageID, model: DEFAULT_MODEL })
 
   get headers() {
     return {
@@ -59,14 +81,14 @@ export default class OpenAIAPI {
         Authorization: `Bearer ${this.accessToken}`,
         'Content-Type': 'application/json',
         'x-openai-assistant-app-id': '',
-        Cookie: this.jar.getCookieStringSync(url),
+        // Cookie: this.jar.getCookieStringSync(url),
         Referer: convID ? `https://chat.openai.com/chat/${convID}` : 'https://chat.openai.com/chat',
       },
       body: JSON.stringify({
         action: 'next',
         conversation_id: convID,
         messages: [{ id: guid, role: 'user', content: { content_type: 'text', parts: [text] } }],
-        model: 'text-davinci-002-render',
+        model: DEFAULT_MODEL,
         parent_message_id: parentMessageID,
       }),
     })
