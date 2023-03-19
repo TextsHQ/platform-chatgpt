@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { orderBy } from 'lodash'
 import { CookieJar } from 'tough-cookie'
-import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, MessageID, ReAuthError } from '@textshq/platform-sdk'
+import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, MessageID, ReAuthError, ThreadFolderName, LoginCreds } from '@textshq/platform-sdk'
 import { tryParseJSON } from '@textshq/platform-sdk/dist/json'
 import type { IncomingMessage } from 'http'
 import type EventEmitter from 'events'
@@ -47,14 +47,14 @@ export default class OpenAI implements PlatformAPI {
     await this.fetchSession()
   }
 
-  login = async ({ cookieJarJSON, jsCodeResult }): Promise<LoginResult> => {
+  login = async ({ cookieJarJSON, jsCodeResult }: LoginCreds): Promise<LoginResult> => {
     if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
     if (jsCodeResult) {
       const { ua, authMethod } = JSON.parse(jsCodeResult)
       this.api.ua = ua
       this.api.authMethod = authMethod || 'login-window'
     }
-    this.api.jar = CookieJar.fromJSON(cookieJarJSON)
+    this.api.jar = CookieJar.fromJSON(cookieJarJSON as any)
     await this.fetchSession()
     return { type: 'success' }
   }
@@ -97,7 +97,7 @@ export default class OpenAI implements PlatformAPI {
     return mapThread(conv, this.currentUser.id)
   }
 
-  getThreads = async (inboxName: InboxName, pagination: PaginationArg) => {
+  getThreads = async (inboxName: ThreadFolderName, pagination: PaginationArg) => {
     if (inboxName === InboxName.REQUESTS) {
       return { items: [], hasMore: false }
     }
