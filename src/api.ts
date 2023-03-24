@@ -17,10 +17,11 @@ export default class OpenAI implements PlatformAPI {
     const t: Thread = {
       id: DEFAULT_THREAD_ID,
       type: 'single',
+      title: '+ New chat',
       timestamp: new Date(),
       description: 'Send /reset or /clear to reset the conversation.',
       messages: {
-        items: [...this.messages.values()],
+        items: [...this.defaultThreadMessages.values()],
         hasMore: false,
       },
       participants,
@@ -30,7 +31,7 @@ export default class OpenAI implements PlatformAPI {
     return t
   }
 
-  private messages = new Map<MessageID, Message>()
+  private defaultThreadMessages = new Map<MessageID, Message>()
 
   private defaultConvID: string
 
@@ -114,7 +115,7 @@ export default class OpenAI implements PlatformAPI {
   getMessages = async (threadID: string, pagination: PaginationArg): Promise<Paginated<Message>> => {
     if (threadID === DEFAULT_THREAD_ID) {
       return {
-        items: orderBy([...this.messages.values()], 'timestamp'),
+        items: orderBy([...this.defaultThreadMessages.values()], 'timestamp'),
         hasMore: false,
       }
     }
@@ -130,17 +131,6 @@ export default class OpenAI implements PlatformAPI {
 
   sendMessage = async (threadID: string, content: MessageContent, options: MessageSendOptions) => {
     if (!content.text) return false
-    if (['/clear', '/reset'].includes(content.text)) {
-      this.defaultConvID = undefined
-      this.messages.clear()
-      this.pushEvent([{
-        type: ServerEventType.STATE_SYNC,
-        objectName: 'message',
-        mutationType: 'delete-all',
-        objectIDs: { threadID },
-      }])
-      return true
-    }
     const userMessage: Message = {
       id: options.pendingMessageID,
       timestamp: new Date(),
@@ -156,8 +146,14 @@ export default class OpenAI implements PlatformAPI {
       participantID: 'chatgpt',
       durationMs: 30_000,
     }])
-    const stream = await this.api.postMessage(threadID === DEFAULT_THREAD_ID ? this.defaultConvID : threadID, options.pendingMessageID, content.text, [...this.messages.values()].at(-1)?.id || randomUUID())
-    this.messages.set(userMessage.id, userMessage)
+    const { items: messages } = await this.getMessages(threadID, undefined)
+    const stream = await this.api.postMessage(
+      threadID === DEFAULT_THREAD_ID ? this.defaultConvID : threadID,
+      options.pendingMessageID,
+      content.text,
+      messages.at(-1)?.id || randomUUID(),
+    )
+    if (threadID === DEFAULT_THREAD_ID) this.defaultThreadMessages.set(userMessage.id, userMessage)
     let response: IncomingMessage
     (stream as EventEmitter).on('response', (res: IncomingMessage) => {
       response = res
@@ -209,9 +205,11 @@ export default class OpenAI implements PlatformAPI {
         objectIDs: { threadID },
         entries,
       }])
-      entries.forEach(e => {
-        this.messages.set(e.id, e)
-      })
+      if (threadID === DEFAULT_THREAD_ID) {
+        entries.forEach(e => {
+          this.defaultThreadMessages.set(e.id, e)
+        })
+      }
     })
     stream.on('end', (chunk: Buffer) => {
       const string = chunk?.toString()

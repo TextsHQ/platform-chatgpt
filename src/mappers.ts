@@ -47,15 +47,20 @@ function parseTextAttributes(text: string): TextAttributes {
 export function mapMessage(message: any, currentUserID: string): Message {
   if (!message.message) return
   const text = message.message.content?.parts.join('\n')
-  const isSender = message.message.role === 'user'
+  const isSender = message.message.author.role === 'user'
   return {
     _original: JSON.stringify(message),
-    id: message.id,
+    id: message.id ?? message.message.id,
     timestamp: new Date(message.message.create_time * 1000),
-    senderID: isSender ? currentUserID : 'chatgpt',
+    senderID: isSender ? currentUserID : {
+      'text-davinci-002-render-sha': 'chatgpt',
+      'text-davinci-002-render-paid': 'chatgpt',
+      'gpt-4': 'chatgpt',
+    }[message.message?.metadata.model_slug],
     isSender,
     text,
     textAttributes: text ? parseTextAttributes(text) : undefined,
+    isHidden: !text,
     behavior: MessageBehavior.KEEP_READ,
   }
 }

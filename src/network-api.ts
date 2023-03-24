@@ -3,7 +3,9 @@ import type { CookieJar } from 'tough-cookie'
 
 const ENDPOINT = 'https://chat.openai.com/'
 
-const DEFAULT_MODEL = 'text-davinci-002-render'
+const DEFAULT_MODEL = 'text-davinci-002-render-sha'
+const TIMEZONE_OFFSET_MIN = 420
+
 export default class OpenAIAPI {
   private http = texts.createHttpClient()
 
@@ -21,6 +23,7 @@ export default class OpenAIAPI {
       headers: {
         ...(pathname.startsWith('backend-api') && { Authorization: `Bearer ${this.accessToken}` }),
         ...(jsonBody && { 'Content-Type': 'application/json' }),
+        Referer: 'https://chat.openai.com/chat',
         ...this.headers,
       },
       cookieJar: this.jar,
@@ -60,7 +63,7 @@ export default class OpenAIAPI {
     return {
       accept: '*/*',
       'accept-language': 'en',
-      'sec-ch-ua': '"Not?A_Brand";v="8", "Chromium";v="108", "Google Chrome";v="108"',
+      'sec-ch-ua': '"Google Chrome";v="111", "Not(A:Brand";v="8", "Chromium";v="111"',
       'sec-ch-ua-mobile': '?0',
       'sec-ch-ua-platform': '"macOS"',
       'sec-fetch-dest': 'empty',
@@ -70,27 +73,34 @@ export default class OpenAIAPI {
     }
   }
 
-  async postMessage(convID: string, guid: string, text: string, parentMessageID: string) {
+  async postMessage(convID: string | undefined, guid: string, text: string, parentMessageID: string) {
     const url = `${ENDPOINT}backend-api/conversation`
+    const headers = {
+      ...this.headers,
+      accept: 'text/event-stream',
+      authorization: `Bearer ${this.accessToken}`,
+      'content-type': 'application/json',
+      cookie: this.jar.getCookieStringSync(url),
+      referer: convID ? `https://chat.openai.com/chat/${convID}` : 'https://chat.openai.com/chat',
+    }
+    const body = {
+      action: 'next',
+      messages: [{
+        id: guid,
+        author: { role: 'user' },
+        role: 'user',
+        content: { content_type: 'text', parts: [text] },
+      }],
+      conversation_id: convID,
+      parent_message_id: parentMessageID,
+      model: DEFAULT_MODEL,
+      timezone_offset_min: TIMEZONE_OFFSET_MIN,
+    }
     const stream = await texts.fetchStream(url, {
       method: 'POST',
       cookieJar: this.jar,
-      headers: {
-        ...this.headers,
-        Accept: 'text/event-stream',
-        Authorization: `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
-        'x-openai-assistant-app-id': '',
-        // Cookie: this.jar.getCookieStringSync(url),
-        Referer: convID ? `https://chat.openai.com/chat/${convID}` : 'https://chat.openai.com/chat',
-      },
-      body: JSON.stringify({
-        action: 'next',
-        conversation_id: convID,
-        messages: [{ id: guid, role: 'user', content: { content_type: 'text', parts: [text] } }],
-        model: DEFAULT_MODEL,
-        parent_message_id: parentMessageID,
-      }),
+      headers,
+      body: JSON.stringify(body),
     })
     return stream
   }
