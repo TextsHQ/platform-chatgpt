@@ -1,39 +1,15 @@
 import { randomUUID } from 'crypto'
-import { orderBy } from 'lodash'
 import { CookieJar } from 'tough-cookie'
-import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, MessageID, ReAuthError, ThreadFolderName, LoginCreds } from '@textshq/platform-sdk'
+import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, ReAuthError, ThreadFolderName, LoginCreds, ThreadID, UserID, MessageID } from '@textshq/platform-sdk'
 import { tryParseJSON } from '@textshq/platform-sdk/dist/json'
 import type { IncomingMessage } from 'http'
 import type EventEmitter from 'events'
 
 import OpenAIAPI from './network-api'
-import { mapMessage, mapThread, participants } from './mappers'
+import { Model, mapMessage, mapModel, mapThread } from './mappers'
 
-const DEFAULT_THREAD_ID = 'chatgpt'
 export default class OpenAI implements PlatformAPI {
   private currentUser: CurrentUser
-
-  private genDefaultThread = () => {
-    const t: Thread = {
-      id: DEFAULT_THREAD_ID,
-      type: 'single',
-      title: '+ New chat',
-      timestamp: new Date(),
-      description: 'Send /reset or /clear to reset the conversation.',
-      messages: {
-        items: [...this.defaultThreadMessages.values()],
-        hasMore: false,
-      },
-      participants,
-      isUnread: false,
-      isReadOnly: false,
-    }
-    return t
-  }
-
-  private defaultThreadMessages = new Map<MessageID, Message>()
-
-  private defaultConvID: string
 
   private pushEvent: OnServerEventCallback
 
@@ -70,10 +46,13 @@ export default class OpenAI implements PlatformAPI {
 
   dispose = () => {}
 
+  private modelsResPromise: Promise<{ models: Model[] }>
+
   private fetchSession = async (refreshing = false) => {
     texts.log('fetching session', { refreshing })
     const json = await this.api.session()
     const { user, accessToken, expires, error } = json
+    this.modelsResPromise = this.api.models()
     this.currentUser = {
       id: user.id,
       fullName: user.name,
@@ -89,13 +68,23 @@ export default class OpenAI implements PlatformAPI {
 
   getCurrentUser = () => this.currentUser
 
+  searchUsers = async () => (await this.modelsResPromise).models.map(mapModel)
+
+  createThread = async (userIDs: UserID[], title: string, message: string) => {
+    const threadID = await new Promise<string>(resolve => {
+      this.postMessage(undefined, randomUUID(), message, randomUUID(), tid => resolve(tid))
+    })
+    if (!threadID) throw Error('unknown')
+    return this.getThread(threadID)
+  }
+
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
     this.pushEvent = onEvent
   }
 
-  getThread = async (threadID: string) => {
+  getThread = async (threadID: ThreadID) => {
     const conv = await this.api.conversation(threadID)
-    return mapThread(conv, this.currentUser.id)
+    return mapThread(conv, this.currentUser.id, threadID)
   }
 
   getThreads = async (inboxName: ThreadFolderName, pagination: PaginationArg) => {
@@ -104,7 +93,6 @@ export default class OpenAI implements PlatformAPI {
     }
     const conv = await this.api.conversations(pagination ? +pagination.cursor : undefined)
     const items = (conv.items as any[]).map(t => mapThread(t, this.currentUser.id))
-    if (!pagination?.cursor) items.unshift(this.genDefaultThread())
     return {
       items,
       hasMore: conv.items.length === conv.limit,
@@ -113,13 +101,8 @@ export default class OpenAI implements PlatformAPI {
   }
 
   getMessages = async (threadID: string, pagination: PaginationArg): Promise<Paginated<Message>> => {
-    if (threadID === DEFAULT_THREAD_ID) {
-      return {
-        items: orderBy([...this.defaultThreadMessages.values()], 'timestamp'),
-        hasMore: false,
-      }
-    }
     const conv = await this.api.conversation(threadID)
+    if (!conv.mapping) return { items: [], hasMore: true }
     const items = Object.values(conv.mapping)
       .map(m => mapMessage(m, this.currentUser.id))
       .filter(Boolean)
@@ -129,35 +112,15 @@ export default class OpenAI implements PlatformAPI {
     }
   }
 
-  sendMessage = async (threadID: string, content: MessageContent, options: MessageSendOptions) => {
-    if (!content.text) return false
-    const userMessage: Message = {
-      id: options.pendingMessageID,
-      timestamp: new Date(),
-      text: content.text,
-      senderID: this.currentUser.id,
-      isSender: true,
-    }
-    this.pushEvent([{
-      type: ServerEventType.USER_ACTIVITY,
-      activityType: ActivityType.CUSTOM,
-      customLabel: 'thinking',
-      threadID,
-      participantID: 'chatgpt',
-      durationMs: 30_000,
-    }])
-    const { items: messages } = await this.getMessages(threadID, undefined)
-    const stream = await this.api.postMessage(
-      threadID === DEFAULT_THREAD_ID ? this.defaultConvID : threadID,
-      options.pendingMessageID,
-      content.text,
-      messages.at(-1)?.id || randomUUID(),
-    )
-    if (threadID === DEFAULT_THREAD_ID) this.defaultThreadMessages.set(userMessage.id, userMessage)
+  private postMessage = async (_convID: string | undefined, newMessageGUID: string, text: string, parentMessageID: string, convIDCallback?: (threadID: ThreadID) => void) => {
+    let convID = _convID
+    let calledConvIDCallback = false
+    const stream = await this.api.postMessage(convID, newMessageGUID, text, parentMessageID)
     let response: IncomingMessage
     (stream as EventEmitter).on('response', (res: IncomingMessage) => {
       response = res
     })
+    let messageID: MessageID
     stream.on('data', (chunk: Buffer) => {
       const string = chunk.toString()
       // texts.log(string)
@@ -175,18 +138,20 @@ export default class OpenAI implements PlatformAPI {
           senderID: 'none',
         }
         if (typeof msg.text !== 'string') msg.text = string
-        this.pushEvent([{
-          type: ServerEventType.USER_ACTIVITY,
-          activityType: ActivityType.NONE,
-          threadID,
-          participantID: 'chatgpt',
-        }, {
-          type: ServerEventType.STATE_SYNC,
-          objectName: 'message',
-          mutationType: 'upsert',
-          objectIDs: { threadID },
-          entries: [msg],
-        }])
+        if (convID) {
+          this.pushEvent([{
+            type: ServerEventType.USER_ACTIVITY,
+            activityType: ActivityType.NONE,
+            threadID: convID,
+            participantID: 'chatgpt',
+          }, {
+            type: ServerEventType.STATE_SYNC,
+            objectName: 'message',
+            mutationType: 'upsert',
+            objectIDs: { threadID: convID },
+            entries: [msg],
+          }])
+        }
         return
       }
       const parsed = string
@@ -195,26 +160,60 @@ export default class OpenAI implements PlatformAPI {
         .filter(Boolean)
         .map(l => tryParseJSON(l))
         .filter(Boolean)
-      if (threadID === DEFAULT_THREAD_ID && parsed[0]) this.defaultConvID = parsed[0].conversation_id
       const entries = parsed.map<Message>(m => mapMessage(m, this.currentUser.id)).filter(Boolean)
       if (!entries.length) return
-      this.pushEvent([{
-        type: ServerEventType.STATE_SYNC,
-        objectName: 'message',
-        mutationType: 'upsert',
-        objectIDs: { threadID },
-        entries,
-      }])
-      if (threadID === DEFAULT_THREAD_ID) {
-        entries.forEach(e => {
-          this.defaultThreadMessages.set(e.id, e)
-        })
+      messageID = entries[0].id
+      if (convID) {
+        if (!calledConvIDCallback) {
+          calledConvIDCallback = true
+          convIDCallback?.(convID)
+        }
+        this.pushEvent([{
+          type: ServerEventType.STATE_SYNC,
+          objectName: 'message',
+          mutationType: 'upsert',
+          objectIDs: { threadID: convID },
+          entries,
+        }])
+      } else {
+        convID = parsed[0]?.conversation_id
       }
     })
-    stream.on('end', (chunk: Buffer) => {
+    stream.on('end', async (chunk: Buffer) => {
       const string = chunk?.toString()
-      // texts.log('end', string)
+      // texts.log('postMessage end', string)
+      if (!_convID && messageID) {
+        const { title } = await this.api.genTitle(convID, messageID)
+        this.pushEvent([{
+          type: ServerEventType.STATE_SYNC,
+          objectName: 'thread',
+          objectIDs: {},
+          mutationType: 'update',
+          entries: [{ id: convID, title }],
+        }])
+      }
     })
+  }
+
+  sendMessage = async (threadID: string, { text }: MessageContent, { pendingMessageID }: MessageSendOptions) => {
+    if (!text) return false
+    const userMessage: Message = {
+      id: pendingMessageID,
+      timestamp: new Date(),
+      text,
+      senderID: this.currentUser.id,
+      isSender: true,
+    }
+    this.pushEvent([{
+      type: ServerEventType.USER_ACTIVITY,
+      activityType: ActivityType.CUSTOM,
+      customLabel: 'thinking',
+      threadID,
+      participantID: 'chatgpt',
+      durationMs: 30_000,
+    }])
+    const { items: messages } = await this.getMessages(threadID, undefined)
+    await this.postMessage(threadID, pendingMessageID, text, messages.at(-1)?.id || randomUUID())
     return [userMessage]
   }
 

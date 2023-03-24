@@ -19,10 +19,9 @@ const info: PlatformInfo = {
   },
   deletionMode: MessageDeletionMode.UNSUPPORTED,
   attributes: new Set([
-    Attribute.NO_CACHE,
-    Attribute.NO_SUPPORT_SINGLE_THREAD_CREATION,
     Attribute.NO_SUPPORT_GROUP_THREAD_CREATION,
     Attribute.NO_SUPPORT_TYPING_INDICATOR,
+    Attribute.SINGLE_THREAD_CREATION_REQUIRES_MESSAGE,
     Attribute.SUPPORTS_DELETE_THREAD,
   ]),
   attachments: {

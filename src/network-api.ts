@@ -18,10 +18,12 @@ export default class OpenAIAPI {
   private accessToken: string
 
   private async call(pathname: string, jsonBody?: any, optOverrides?: Partial<FetchOptions>) {
+    const isBackendAPI = pathname.startsWith('backend-api')
+    if (isBackendAPI && !this.accessToken) throw Error('no accessToken')
     const opts: FetchOptions = {
       body: jsonBody ? JSON.stringify(jsonBody) : undefined,
       headers: {
-        ...(pathname.startsWith('backend-api') && { Authorization: `Bearer ${this.accessToken}` }),
+        ...(isBackendAPI && { Authorization: `Bearer ${this.accessToken}` }),
         ...(jsonBody && { 'Content-Type': 'application/json' }),
         Referer: 'https://chat.openai.com/chat',
         ...this.headers,
@@ -29,13 +31,20 @@ export default class OpenAIAPI {
       cookieJar: this.jar,
       ...optOverrides,
     }
-    const res = await this.http.requestAsString(`${ENDPOINT}${pathname}`, opts)
+    const url = `${ENDPOINT}${pathname}`
+    const res = await this.http.requestAsString(url, opts)
     if (res.body[0] === '<') {
-      console.log(res.statusCode, res.body)
+      console.log(res.statusCode, url, res.body)
       const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(res.body) || []
       throw Error(`expected json, got html, status code=${res.statusCode}, title=${title}`)
+    } else if (res.body.startsWith('Internal')) {
+      console.log(res.statusCode, url, res.body)
+      throw Error(res.body)
     }
     const json = JSON.parse(res.body)
+    if (json.detail) { // potential error
+      texts.error(url, json.detail)
+    }
     return json
   }
 
@@ -57,7 +66,7 @@ export default class OpenAIAPI {
     this.call(`backend-api/conversation/${id}`, body, { method: 'PATCH' })
 
   genTitle = (convID: string, messageID: string) =>
-    this.call(`backend-api/conversation/gen_title/${convID}`, { message_id: messageID, model: DEFAULT_MODEL })
+    this.call(`backend-api/conversation/gen_title/${convID}`, { message_id: messageID }, { method: 'POST' })
 
   get headers() {
     return {
@@ -73,7 +82,7 @@ export default class OpenAIAPI {
     }
   }
 
-  async postMessage(convID: string | undefined, guid: string, text: string, parentMessageID: string) {
+  async postMessage(convID: string | undefined, guid: string, text: string, parentMessageID?: string) {
     const url = `${ENDPOINT}backend-api/conversation`
     const headers = {
       ...this.headers,
