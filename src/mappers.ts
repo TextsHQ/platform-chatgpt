@@ -58,6 +58,7 @@ export function mapMessage(message: any, currentUserID: string): Message {
   if (!message.message) return
   const text = message.message.content?.parts.join('\n')
   const isSender = message.message.author.role === 'user'
+  const model_slug = message.message?.metadata.model_slug
   return {
     _original: JSON.stringify(message),
     id: message.id ?? message.message.id,
@@ -66,12 +67,15 @@ export function mapMessage(message: any, currentUserID: string): Message {
       'text-davinci-002-render-sha': 'chatgpt',
       'text-davinci-002-render-paid': 'chatgpt',
       'gpt-4': 'chatgpt',
-    }[message.message?.metadata.model_slug],
+    }[model_slug],
     isSender,
     text,
     textAttributes: text ? parseTextAttributes(text) : undefined,
     isHidden: !text,
     behavior: MessageBehavior.KEEP_READ,
+    extra: {
+      model_slug,
+    },
   }
 }
 

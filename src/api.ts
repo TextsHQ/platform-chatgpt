@@ -8,6 +8,8 @@ import type EventEmitter from 'events'
 import OpenAIAPI from './network-api'
 import { Model, mapMessage, mapModel, mapThread } from './mappers'
 
+const DEFAULT_MODEL = 'text-davinci-002-render-sha'
+
 export default class OpenAI implements PlatformAPI {
   private currentUser: CurrentUser
 
@@ -72,7 +74,7 @@ export default class OpenAI implements PlatformAPI {
 
   createThread = async (userIDs: UserID[], title: string, message: string) => {
     const threadID = await new Promise<string>(resolve => {
-      this.postMessage(undefined, randomUUID(), message, randomUUID(), tid => resolve(tid))
+      this.postMessage(userIDs[0], undefined, randomUUID(), message, randomUUID(), tid => resolve(tid))
     })
     if (!threadID) throw Error('unknown')
     return this.getThread(threadID)
@@ -112,10 +114,10 @@ export default class OpenAI implements PlatformAPI {
     }
   }
 
-  private postMessage = async (_convID: string | undefined, newMessageGUID: string, text: string, parentMessageID: string, convIDCallback?: (threadID: ThreadID) => void) => {
+  private postMessage = async (model: string, _convID: string | undefined, newMessageGUID: string, text: string, parentMessageID: string, convIDCallback?: (threadID: ThreadID) => void) => {
     let convID = _convID
     let calledConvIDCallback = false
-    const stream = await this.api.postMessage(convID, newMessageGUID, text, parentMessageID)
+    const stream = await this.api.postMessage(model, convID, newMessageGUID, text, parentMessageID)
     let response: IncomingMessage
     (stream as EventEmitter).on('response', (res: IncomingMessage) => {
       response = res
@@ -213,7 +215,8 @@ export default class OpenAI implements PlatformAPI {
       durationMs: 30_000,
     }])
     const { items: messages } = await this.getMessages(threadID, undefined)
-    await this.postMessage(threadID, pendingMessageID, text, messages.at(-1)?.id || randomUUID())
+    const lastMessage = messages.at(-1)
+    await this.postMessage(lastMessage?.extra?.model || DEFAULT_MODEL, threadID, pendingMessageID, text, lastMessage?.id || randomUUID())
     return [userMessage]
   }
 

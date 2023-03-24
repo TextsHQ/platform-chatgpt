@@ -3,9 +3,6 @@ import type { CookieJar } from 'tough-cookie'
 
 const ENDPOINT = 'https://chat.openai.com/'
 
-const DEFAULT_MODEL = 'text-davinci-002-render-sha'
-const TIMEZONE_OFFSET_MIN = 420
-
 export default class OpenAIAPI {
   private http = texts.createHttpClient()
 
@@ -82,7 +79,7 @@ export default class OpenAIAPI {
     }
   }
 
-  async postMessage(convID: string | undefined, guid: string, text: string, parentMessageID?: string) {
+  async postMessage(model: string, convID: string | undefined, guid: string, text: string, parentMessageID?: string) {
     const url = `${ENDPOINT}backend-api/conversation`
     const headers = {
       ...this.headers,
@@ -102,8 +99,8 @@ export default class OpenAIAPI {
       }],
       conversation_id: convID,
       parent_message_id: parentMessageID,
-      model: DEFAULT_MODEL,
-      timezone_offset_min: TIMEZONE_OFFSET_MIN,
+      model,
+      timezone_offset_min: new Date().getTimezoneOffset(),
     }
     const stream = await texts.fetchStream(url, {
       method: 'POST',
