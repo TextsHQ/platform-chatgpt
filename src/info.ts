@@ -7,9 +7,9 @@ if (window.__NEXT_DATA__?.props?.pageProps?.user) setTimeout(() => window.close(
 `
 
 const info: PlatformInfo = {
-  name: 'openai-user',
+  name: 'chatgpt',
   version: '1.0.0',
-  displayName: 'OpenAI',
+  displayName: 'ChatGPT',
   icon,
   loginMode: 'browser',
   browserLogin: {
