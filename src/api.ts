@@ -33,6 +33,10 @@ export default class OpenAI implements PlatformAPI {
       this.api.ua = ua
       this.api.authMethod = authMethod || 'login-window'
     }
+    // unknown why this is needed but without it the cloudflare check is more frequently hit
+    // removing the cookie with name '_puid' is an alternative
+    // chrome browser sends _puid too
+    cookieJarJSON.cookies = cookieJarJSON.cookies.filter(c => c.domain !== 'openai.com')
     this.api.jar = CookieJar.fromJSON(cookieJarJSON as any)
     await this.fetchSession()
     return { type: 'success' }
