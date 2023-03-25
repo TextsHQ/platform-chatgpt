@@ -57,7 +57,7 @@ export default class OpenAI implements PlatformAPI {
   private fetchSession = async (refreshing = false) => {
     texts.log('fetching session', { refreshing })
     const json = await this.api.session()
-    texts.log(await this.api.accountsCheck())
+    this.api.accountsCheck().then(texts.log)
     const { user, accessToken, expires, error } = json
     this.modelsResPromise = this.api.models()
     this.currentUser = {
