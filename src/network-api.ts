@@ -51,6 +51,8 @@ export default class OpenAIAPI {
     return json
   }
 
+  accountsCheck = () => this.call('backend-api/accounts/check')
+
   models = () => this.call('backend-api/models')
 
   conversations = (offset = 0, limit = 20) =>
