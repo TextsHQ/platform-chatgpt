@@ -202,8 +202,9 @@ export default class OpenAI implements PlatformAPI {
     })
   }
 
-  sendMessage = async (threadID: string, { text }: MessageContent, { pendingMessageID }: MessageSendOptions) => {
+  sendMessage = async (threadID: string, { text, filePath, fileName }: MessageContent, { pendingMessageID }: MessageSendOptions) => {
     if (!text) return false
+    // if (!text && !filePath) return false
     const userMessage: Message = {
       id: pendingMessageID,
       timestamp: new Date(),
@@ -221,7 +222,13 @@ export default class OpenAI implements PlatformAPI {
     }])
     const { items: messages } = await this.getMessages(threadID, undefined)
     const lastMessage = messages.at(-1)
-    await this.postMessage(lastMessage?.extra?.model || DEFAULT_MODEL, threadID, pendingMessageID, text, lastMessage?.id || randomUUID())
+    const model = lastMessage?.extra?.model || DEFAULT_MODEL
+    const parentMessageID = lastMessage?.id || randomUUID()
+    if (filePath) {
+      console.log(await this.api.uploadFile(threadID, model, parentMessageID, filePath, fileName))
+      return true
+    }
+    await this.postMessage(model, threadID, pendingMessageID, text, parentMessageID)
     return [userMessage]
   }
 

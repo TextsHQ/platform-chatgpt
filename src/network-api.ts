@@ -1,3 +1,5 @@
+import fs from 'fs'
+import FormData from 'form-data'
 import { FetchOptions, texts } from '@textshq/platform-sdk'
 import type { CookieJar } from 'tough-cookie'
 
@@ -66,6 +68,18 @@ export default class OpenAIAPI {
 
   genTitle = (convID: string, messageID: string) =>
     this.call(`backend-api/conversation/gen_title/${convID}`, { message_id: messageID }, { method: 'POST' })
+
+  uploadFile = async (convID: string, model: string, parentMessageID: string, filePath: string, fileName: string) => {
+    const body = new FormData()
+    body.append('conversation_id', convID)
+    body.append('model', model)
+    body.append('parent_message_id', parentMessageID)
+    body.append('file', await fs.promises.readFile(filePath), { filename: fileName })
+    return this.call('backend-api/conversation/upload', undefined, {
+      body,
+      method: 'POST',
+    })
+  }
 
   get headers() {
     return {
