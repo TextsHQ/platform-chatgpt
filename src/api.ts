@@ -34,6 +34,10 @@ export default class OpenAI implements PlatformAPI {
       this.api.authMethod = authMethod || 'login-window'
     }
     this.api.jar = CookieJar.fromJSON(cookieJarJSON as any)
+    // if (texts.IS_DEV) {
+    //   const cookie = this.api.jar.getCookieStringSync('https://chat.openai.com/api/auth/session')
+    //   console.log({ cookie })
+    // }
     await this.fetchSession()
     return { type: 'success' }
   }
@@ -55,6 +59,11 @@ export default class OpenAI implements PlatformAPI {
     const json = await this.api.session()
     this.api.accountsCheck().then(texts.log)
     const { user, accessToken, expires, error } = json
+    if (error === 'RefreshAccessTokenError') throw new ReAuthError()
+    if (!user) {
+      console.log(json)
+      throw Error('no user')
+    }
     this.modelsResPromise = this.api.models()
     this.currentUser = {
       id: user.id,
@@ -63,7 +72,6 @@ export default class OpenAI implements PlatformAPI {
       imgURL: user.image,
       displayText: user.name,
     }
-    if (error === 'RefreshAccessTokenError') throw new ReAuthError()
     // const dist = new Date(expires).getTime() - Date.now()
     // console.log(new Date(expires), dist)
     // setTimeout(this.fetchSession, new Date(expires).getTime() - Date.now(), true)
