@@ -122,7 +122,7 @@ export default class OpenAI implements PlatformAPI {
       .filter(Boolean)
     const lastMessage = items.at(-1)
     if (lastMessage && !this.updatedDescriptionSet.has(threadID)) {
-      const model = (await this.modelsResPromise).models.find(m => m.slug === lastMessage.extra.model_slug)
+      const model = (await this.modelsResPromise).models.find(m => m.slug === lastMessage.extra.modelSlug)
       if (model) {
         this.pushEvent([{
           type: ServerEventType.STATE_SYNC,
