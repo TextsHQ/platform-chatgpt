@@ -64,18 +64,21 @@ function parseTextAttributes(text: string): TextAttributes {
 
 export function mapMessage(message: any, currentUserID: string): Message {
   if (!message.message) return
-  const text = message.message.content?.parts.join('\n')
+  const text = message.message.content?.parts?.join('\n')
   const isSender = message.message.author.role === 'user'
   const model_slug = message.message?.metadata.model_slug
   return {
     _original: JSON.stringify(message),
     id: message.id ?? message.message.id,
     timestamp: new Date(message.message.create_time * 1000),
-    senderID: isSender ? currentUserID : {
-      'text-davinci-002-render-sha': 'chatgpt',
-      'text-davinci-002-render-paid': 'chatgpt',
-      'gpt-4': 'chatgpt',
-    }[model_slug],
+    senderID: isSender
+      ? currentUserID
+      : {
+        'text-davinci-002-plugins': 'chatgpt',
+        'text-davinci-002-render-sha': 'chatgpt',
+        'text-davinci-002-render-paid': 'chatgpt',
+        'gpt-4': 'chatgpt',
+      }[model_slug] ?? 'chatgpt',
     isSender,
     text,
     textAttributes: text ? parseTextAttributes(text) : undefined,
