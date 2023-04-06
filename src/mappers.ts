@@ -73,7 +73,7 @@ function parseTextAttributes(text: string, isPlugin: boolean): TextAttributes {
 }
 
 export function mapMessage(message: any, currentUserID: string): Message {
-  if (!message.message) return
+  if (!message.message?.create_time) return
   const textHeading = (() => {
     if (message.message.recipient !== 'all' && message.message.author.role === 'assistant') return `Response to ${message.message.recipient?.split('.', 1)?.[0]}`
     if (message.message.author.role === 'tool') return `Response from ${message.message.author.name?.split('.', 1)?.[0]}`
