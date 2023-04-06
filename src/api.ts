@@ -112,12 +112,31 @@ export default class OpenAI implements PlatformAPI {
     }
   }
 
+  private updatedDescriptionSet = new Set<string>()
+
   getMessages = async (threadID: string, pagination: PaginationArg): Promise<Paginated<Message>> => {
     const conv = await this.api.conversation(threadID)
     if (!conv.mapping) return { items: [], hasMore: true }
     const items = Object.values(conv.mapping)
       .map(m => mapMessage(m, this.currentUser.id))
       .filter(Boolean)
+    const lastMessage = items.at(-1)
+    if (lastMessage && !this.updatedDescriptionSet.has(threadID)) {
+      const model = (await this.modelsResPromise).models.find(m => m.slug === lastMessage.extra.model_slug)
+      if (model) {
+        this.pushEvent([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'update',
+          objectName: 'thread',
+          objectIDs: {},
+          entries: [{
+            id: threadID,
+            description: `Model: ${model.title} (${model.slug})`,
+          }],
+        }])
+        this.updatedDescriptionSet.add(threadID)
+      }
+    }
     return {
       items,
       hasMore: false,
