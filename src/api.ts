@@ -6,7 +6,8 @@ import type { IncomingMessage } from 'http'
 import type EventEmitter from 'events'
 
 import OpenAIAPI from './network-api'
-import { Model, mapMessage, mapModel, mapThread } from './mappers'
+import { Plugin, Model, ChatGPTConv } from './interfaces'
+import { mapMessage, mapModel, mapThread } from './mappers'
 
 const DEFAULT_MODEL = 'text-davinci-002-render-sha'
 
@@ -54,18 +55,22 @@ export default class OpenAI implements PlatformAPI {
 
   private modelsResPromise: Promise<{ models: Model[] }>
 
+  private pluginsPromise: Promise<{ count: number, items: Plugin[] }>
+
   private fetchSession = async (refreshing = false) => {
     texts.log('fetching session', { refreshing })
     const json = await this.api.session()
-    this.api.accountsCheck().then(texts.log)
     const { user, accessToken, expires, error } = json
     if (error === 'RefreshAccessTokenError') throw new ReAuthError()
     if (!user) {
       console.log(json)
       throw Error('no user')
     }
+    this.api.accountsCheck().then(texts.log)
     this.modelsResPromise = this.api.models()
+    this.pluginsPromise = this.api.plugins()
     this.modelsResPromise.then(res => texts.log(JSON.stringify(res, null, 2)))
+    // this.pluginsPromise.then(res => texts.log(JSON.stringify(res, null, 2)))
     this.currentUser = {
       id: user.id,
       fullName: user.name,
@@ -124,6 +129,10 @@ export default class OpenAI implements PlatformAPI {
     if (lastMessage && !this.updatedDescriptionSet.has(threadID)) {
       const model = (await this.modelsResPromise).models.find(m => m.slug === lastMessage.extra.modelSlug)
       if (model) {
+        const plugins = conv.plugin_ids
+          ? await Promise.all(conv.plugin_ids.map(async pid => (await this.pluginsPromise).items.find(i => i.id === pid)))
+          : undefined
+        const pluginNames = plugins?.map(p => p.manifest.name_for_human).filter(Boolean).join(', ')
         this.pushEvent([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
@@ -131,7 +140,7 @@ export default class OpenAI implements PlatformAPI {
           objectIDs: {},
           entries: [{
             id: threadID,
-            description: `Model: ${model.title} (${model.slug})`,
+            description: `Model: ${model.title} (${model.slug})${pluginNames ? `\nEnabled plugins: ${pluginNames}` : ''}`,
           }],
         }])
         this.updatedDescriptionSet.add(threadID)

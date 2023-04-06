@@ -3,6 +3,8 @@ import FormData from 'form-data'
 import { FetchOptions, texts } from '@textshq/platform-sdk'
 import type { CookieJar } from 'tough-cookie'
 
+import { ChatGPTConv } from './interfaces'
+
 const ENDPOINT = 'https://chat.openai.com/'
 
 export default class OpenAIAPI {
@@ -16,7 +18,7 @@ export default class OpenAIAPI {
 
   private accessToken: string
 
-  private async call(pathname: string, jsonBody?: any, optOverrides?: Partial<FetchOptions>) {
+  private async call<ResultType = any>(pathname: string, jsonBody?: any, optOverrides?: Partial<FetchOptions>) {
     const isBackendAPI = pathname.startsWith('backend-api')
     if (isBackendAPI && !this.accessToken) throw Error('no accessToken')
     const opts: FetchOptions = {
@@ -44,7 +46,7 @@ export default class OpenAIAPI {
     if (json.detail) { // potential error
       texts.error(url, json.detail)
     }
-    return json
+    return json as ResultType
   }
 
   async session() {
@@ -57,11 +59,14 @@ export default class OpenAIAPI {
 
   models = () => this.call('backend-api/models')
 
+  plugins = (offset = 0, limit = 20, isInstalled = true) =>
+    this.call('backend-api/aip/p', undefined, { searchParams: { offset, limit, is_installed: String(isInstalled) } })
+
   conversations = (offset = 0, limit = 20) =>
     this.call('backend-api/conversations', undefined, { searchParams: { offset, limit } })
 
   conversation = (id: string) =>
-    this.call(`backend-api/conversation/${id}`)
+    this.call<ChatGPTConv>(`backend-api/conversation/${id}`)
 
   patchConversation = (id: string, body: any) =>
     this.call(`backend-api/conversation/${id}`, body, { method: 'PATCH' })
