@@ -65,6 +65,7 @@ export default class OpenAI implements PlatformAPI {
       throw Error('no user')
     }
     this.modelsResPromise = this.api.models()
+    this.modelsResPromise.then(res => texts.log(JSON.stringify(res, null, 2)))
     this.currentUser = {
       id: user.id,
       fullName: user.name,
@@ -123,6 +124,40 @@ export default class OpenAI implements PlatformAPI {
     }
   }
 
+  private handleSendError = (response: IncomingMessage, ct: string, string: string, convID: string | undefined) => {
+    // 401 application/json {"detail":{"message":"Your authentication token has expired. Please try signing in again.","type":"invalid_request_error","param":null,"code":"token_expired"}}
+    // 500 application/json {"detail":"Error getting system message: Invalid variable type: value should be str, int or float, got None of type <class 'NoneType'>"}
+    texts.log(response.statusCode, ct, string)
+    const json = string.startsWith('<') ? string : JSON.parse(string)
+    const msg: Message = {
+      id: randomUUID(),
+      timestamp: new Date(),
+      text: json.detail?.message ?? json.detail ?? string,
+      isAction: true,
+      senderID: 'none',
+    }
+    if (typeof msg.text !== 'string') msg.text = string
+    if (convID) {
+      this.pushEvent([{
+        type: ServerEventType.USER_ACTIVITY,
+        activityType: ActivityType.NONE,
+        threadID: convID,
+        participantID: 'chatgpt',
+      }, {
+        type: ServerEventType.STATE_SYNC,
+        objectName: 'message',
+        mutationType: 'upsert',
+        objectIDs: { threadID: convID },
+        entries: [msg],
+      }])
+    } else {
+      this.pushEvent([{
+        type: ServerEventType.TOAST,
+        toast: { text: msg.text, timeoutMs: -1 },
+      }])
+    }
+  }
+
   private postMessage = async (model: string, _convID: string | undefined, newMessageGUID: string, text: string, parentMessageID: string, convIDCallback?: (threadID: ThreadID) => void) => {
     let convID = _convID
     let calledConvIDCallback = false
@@ -137,34 +172,7 @@ export default class OpenAI implements PlatformAPI {
       // texts.log(string)
       if (string === '[DONE]') return
       const ct = response.headers['content-type']
-      if (!ct.includes('text/event-stream')) {
-        // 401 application/json {"detail":{"message":"Your authentication token has expired. Please try signing in again.","type":"invalid_request_error","param":null,"code":"token_expired"}}
-        texts.log(response.statusCode, ct, string)
-        const json = string.startsWith('<') ? string : JSON.parse(string)
-        const msg: Message = {
-          id: randomUUID(),
-          timestamp: new Date(),
-          text: json.detail?.message ?? json.detail ?? string,
-          isAction: true,
-          senderID: 'none',
-        }
-        if (typeof msg.text !== 'string') msg.text = string
-        if (convID) {
-          this.pushEvent([{
-            type: ServerEventType.USER_ACTIVITY,
-            activityType: ActivityType.NONE,
-            threadID: convID,
-            participantID: 'chatgpt',
-          }, {
-            type: ServerEventType.STATE_SYNC,
-            objectName: 'message',
-            mutationType: 'upsert',
-            objectIDs: { threadID: convID },
-            entries: [msg],
-          }])
-        }
-        return
-      }
+      if (!ct.includes('text/event-stream')) return this.handleSendError(response, ct, string, convID)
       const parsed = string
         .split('data: ')
         .map(l => l.trim())
@@ -207,8 +215,7 @@ export default class OpenAI implements PlatformAPI {
   }
 
   sendMessage = async (threadID: string, { text, filePath, fileName }: MessageContent, { pendingMessageID }: MessageSendOptions) => {
-    if (!text) return false
-    // if (!text && !filePath) return false
+    if (!text && !filePath) return false
     const userMessage: Message = {
       id: pendingMessageID,
       timestamp: new Date(),
@@ -229,10 +236,21 @@ export default class OpenAI implements PlatformAPI {
     const model = lastMessage?.extra?.model || DEFAULT_MODEL
     const parentMessageID = lastMessage?.id || randomUUID()
     if (filePath) {
-      console.log(await this.api.uploadFile(threadID, model, parentMessageID, filePath, fileName))
-      return true
+      console.log('uploading', filePath)
+      const res = await this.api.uploadFile(threadID, model, parentMessageID, filePath, fileName)
+      console.log('upload res', res)
+      if (res.detail) {
+        this.pushEvent([{
+          type: ServerEventType.USER_ACTIVITY,
+          activityType: ActivityType.NONE,
+          threadID,
+          participantID: 'chatgpt',
+        }])
+        throw Error(JSON.stringify(res))
+      }
+    } else {
+      await this.postMessage(model, threadID, pendingMessageID, text, parentMessageID)
     }
-    await this.postMessage(model, threadID, pendingMessageID, text, parentMessageID)
     return [userMessage]
   }
 

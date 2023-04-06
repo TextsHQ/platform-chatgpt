@@ -13,7 +13,15 @@ const participants = {
   ],
 }
 
-export type Model = { slug: string, title: string }
+export type Model = {
+  slug: string
+  title: string
+  max_tokens: number
+  description: string
+  tags: string[]
+  enabled_tools: string[]
+  qualitative_properties: any
+}
 
 export function mapModel(model: Model): User {
   return {
