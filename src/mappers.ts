@@ -14,7 +14,7 @@ const participants = {
   ],
 }
 
-export type Model = {
+export interface Model {
   slug: string
   title: string
   max_tokens: number
@@ -22,6 +22,34 @@ export type Model = {
   tags: string[]
   enabled_tools: string[]
   qualitative_properties: any
+}
+
+interface Author {
+  role: 'user' | 'assistant' | 'tool'
+  name?: string
+}
+
+interface ChatGPTMessage {
+  id?: string
+  message?: {
+    id?: string
+    recipient?: string
+    author: Author
+    content?: {
+      parts?: string[]
+    }
+    create_time?: number
+    metadata?: {
+      model_slug?: string
+    }
+  }
+}
+
+interface ChatGPTConv {
+  id: string
+  title: string
+  create_time: string
+  mapping: Record<string, ChatGPTMessage>
 }
 
 export function mapModel(model: Model): User {
@@ -72,7 +100,7 @@ function parseTextAttributes(text: string, isPlugin: boolean): TextAttributes {
   return { entities }
 }
 
-export function mapMessage(message: any, currentUserID: string): Message {
+export function mapMessage(message: ChatGPTMessage, currentUserID: string): Message {
   if (!message.message?.create_time) return
   const textHeading = (() => {
     if (message.message.recipient !== 'all' && message.message.author.role === 'assistant') return `Response to ${message.message.recipient?.split('.', 1)?.[0]}`
@@ -113,7 +141,7 @@ export function mapMessage(message: any, currentUserID: string): Message {
   }
 }
 
-export function mapThread(conv: any, currentUserID: string, fallbackID?: ThreadID): Thread {
+export function mapThread(conv: ChatGPTConv, currentUserID: string, fallbackID?: ThreadID): Thread {
   return {
     _original: JSON.stringify(conv),
     id: conv.id ?? fallbackID,
