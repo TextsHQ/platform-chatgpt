@@ -116,6 +116,7 @@ export default class OpenAIAPI {
       conversation_id: convID,
       parent_message_id: parentMessageID,
       model,
+      plugin_ids: [],
       timezone_offset_min: new Date().getTimezoneOffset(),
     }
     const stream = await texts.fetchStream(url, {
