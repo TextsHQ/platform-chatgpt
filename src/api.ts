@@ -276,9 +276,8 @@ export default class OpenAI implements PlatformAPI {
     const model = lastMessage?.message?.metadata?.model_slug || DEFAULT_MODEL
     const parentMessageID = lastMessage?.id || randomUUID()
     if (filePath) {
-      console.log('uploading', filePath)
       const res = await this.api.uploadFile(threadID, model, parentMessageID, filePath, fileName)
-      console.log('upload res', res)
+      console.log('upload res', JSON.stringify(res, null, 2))
       if (res.detail) {
         this.pushEvent([{
           type: ServerEventType.USER_ACTIVITY,
@@ -287,6 +286,14 @@ export default class OpenAI implements PlatformAPI {
           participantID: 'chatgpt',
         }])
         throw Error(JSON.stringify(res))
+      } else if (Array.isArray(res)) {
+        this.pushEvent(res.map(message => ({
+          type: ServerEventType.STATE_SYNC,
+          objectName: 'message',
+          mutationType: 'upsert',
+          objectIDs: { threadID: message.conversation_id },
+          entries: [mapMessage(message, this.currentUser.id)],
+        })))
       }
     } else {
       await this.postMessage({ model, conversationID: threadID, guid: pendingMessageID, text, parentMessageID })
