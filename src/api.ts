@@ -92,7 +92,7 @@ export default class OpenAI implements PlatformAPI {
     const model = (await this.modelsResPromise).models.find(m => m.slug === modelID)
     const pluginIDs = model.enabled_tools
       ? (await this.pluginsPromise).items.map(i => i.id)
-      : []
+      : undefined
     const threadID = await new Promise<string>(resolve => {
       this.postMessage({
         model: modelID,
