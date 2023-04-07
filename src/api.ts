@@ -6,7 +6,7 @@ import type { IncomingMessage } from 'http'
 import type EventEmitter from 'events'
 
 import OpenAIAPI from './network-api'
-import { Plugin, Model, ChatGPTConv } from './interfaces'
+import { Plugin, Model } from './interfaces'
 import { mapMessage, mapModel, mapThread } from './mappers'
 
 const DEFAULT_MODEL = 'text-davinci-002-render-sha'
@@ -274,7 +274,6 @@ export default class OpenAI implements PlatformAPI {
     const conv = await this.api.conversation(threadID)
     const lastMessage = Object.values(conv.mapping).at(-1)
     const model = lastMessage?.message?.metadata?.model_slug || DEFAULT_MODEL
-    const pluginIDs = conv.plugin_ids || []
     const parentMessageID = lastMessage?.id || randomUUID()
     if (filePath) {
       console.log('uploading', filePath)
@@ -290,7 +289,7 @@ export default class OpenAI implements PlatformAPI {
         throw Error(JSON.stringify(res))
       }
     } else {
-      await this.postMessage({ model, conversationID: threadID, guid: pendingMessageID, text, parentMessageID, pluginIDs })
+      await this.postMessage({ model, conversationID: threadID, guid: pendingMessageID, text, parentMessageID })
     }
     return [userMessage]
   }

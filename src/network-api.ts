@@ -105,9 +105,10 @@ export default class OpenAIAPI {
     conversationID: string | undefined
     guid: string
     text: string
-    pluginIDs: string[]
+    pluginIDs?: string[]
     parentMessageID: string
   }) {
+    if (conversationID && pluginIDs) throw Error('set either conversationID or pluginIDs')
     const url = `${ENDPOINT}backend-api/conversation`
     const headers = {
       ...this.headers,
