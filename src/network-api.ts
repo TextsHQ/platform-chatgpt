@@ -100,7 +100,14 @@ export default class OpenAIAPI {
     }
   }
 
-  async postMessage(model: string, convID: string | undefined, guid: string, text: string, parentMessageID?: string) {
+  async postMessage({ model, conversationID, guid, text, pluginIDs, parentMessageID }: {
+    model: string
+    conversationID: string | undefined
+    guid: string
+    text: string
+    pluginIDs: string[]
+    parentMessageID: string
+  }) {
     const url = `${ENDPOINT}backend-api/conversation`
     const headers = {
       ...this.headers,
@@ -108,7 +115,7 @@ export default class OpenAIAPI {
       authorization: `Bearer ${this.accessToken}`,
       'content-type': 'application/json',
       cookie: this.jar.getCookieStringSync(url),
-      referer: convID ? `https://chat.openai.com/chat/${convID}` : 'https://chat.openai.com/chat',
+      referer: conversationID ? `https://chat.openai.com/chat/${conversationID}` : 'https://chat.openai.com/chat',
     }
     const body = {
       action: 'next',
@@ -118,10 +125,10 @@ export default class OpenAIAPI {
         role: 'user',
         content: { content_type: 'text', parts: [text] },
       }],
-      conversation_id: convID,
+      conversation_id: conversationID,
       parent_message_id: parentMessageID,
       model,
-      plugin_ids: [],
+      plugin_ids: pluginIDs,
       timezone_offset_min: new Date().getTimezoneOffset(),
     }
     const stream = await texts.fetchStream(url, {

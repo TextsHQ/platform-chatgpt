@@ -88,8 +88,20 @@ export default class OpenAI implements PlatformAPI {
   searchUsers = async () => (await this.modelsResPromise).models.map(mapModel)
 
   createThread = async (userIDs: UserID[], title: string, message: string) => {
+    const modelID = userIDs[0]
+    const model = (await this.modelsResPromise).models.find(m => m.slug === modelID)
+    const pluginIDs = model.enabled_tools
+      ? (await this.pluginsPromise).items.map(i => i.id).slice(0, 3)
+      : []
     const threadID = await new Promise<string>(resolve => {
-      this.postMessage(userIDs[0], undefined, randomUUID(), message, randomUUID(), tid => resolve(tid))
+      this.postMessage({
+        model: modelID,
+        guid: randomUUID(),
+        parentMessageID: randomUUID(),
+        text: message,
+        pluginIDs,
+        conversationID: undefined,
+      }, tid => resolve(tid))
     })
     if (!threadID) throw Error('unknown')
     return this.getThread(threadID)
@@ -186,10 +198,10 @@ export default class OpenAI implements PlatformAPI {
     }
   }
 
-  private postMessage = async (model: string, _convID: string | undefined, newMessageGUID: string, text: string, parentMessageID: string, convIDCallback?: (threadID: ThreadID) => void) => {
-    let convID = _convID
+  private postMessage = async ({ model, conversationID, guid, text, parentMessageID, pluginIDs }: Parameters<typeof this.api.postMessage>[0], convIDCallback?: (threadID: ThreadID) => void) => {
+    let convID = conversationID
     let calledConvIDCallback = false
-    const stream = await this.api.postMessage(model, convID, newMessageGUID, text, parentMessageID)
+    const stream = await this.api.postMessage({ model, conversationID: convID, guid, text, parentMessageID, pluginIDs })
     let response: IncomingMessage
     (stream as EventEmitter).on('response', (res: IncomingMessage) => {
       response = res
@@ -229,7 +241,7 @@ export default class OpenAI implements PlatformAPI {
     stream.on('end', async (chunk: Buffer) => {
       const string = chunk?.toString()
       // texts.log('postMessage end', string)
-      if (!_convID && messageID) {
+      if (!conversationID && messageID) {
         const { title } = await this.api.genTitle(convID, messageID)
         this.pushEvent([{
           type: ServerEventType.STATE_SYNC,
@@ -259,9 +271,10 @@ export default class OpenAI implements PlatformAPI {
       participantID: 'chatgpt',
       durationMs: 30_000,
     }])
-    const { items: messages } = await this.getMessages(threadID, undefined)
-    const lastMessage = messages.at(-1)
-    const model = lastMessage?.extra?.model || DEFAULT_MODEL
+    const conv = await this.api.conversation(threadID)
+    const lastMessage = Object.values(conv.mapping).at(-1)
+    const model = lastMessage?.message?.metadata?.model_slug || DEFAULT_MODEL
+    const pluginIDs = conv.plugin_ids || []
     const parentMessageID = lastMessage?.id || randomUUID()
     if (filePath) {
       console.log('uploading', filePath)
@@ -277,7 +290,7 @@ export default class OpenAI implements PlatformAPI {
         throw Error(JSON.stringify(res))
       }
     } else {
-      await this.postMessage(model, threadID, pendingMessageID, text, parentMessageID)
+      await this.postMessage({ model, conversationID: threadID, guid: pendingMessageID, text, parentMessageID, pluginIDs })
     }
     return [userMessage]
   }

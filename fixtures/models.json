@@ -1,0 +1,80 @@
+{
+  "models": [
+    {
+      "slug": "text-davinci-002-plugins",
+      "max_tokens": 8195,
+      "title": "Plugins",
+      "description": "An experimental model that knows when and how to use plugins",
+      "tags": [
+        "alpha"
+      ],
+      "qualitative_properties": {},
+      "enabled_tools": [
+        "tools3"
+      ]
+    },
+    {
+      "slug": "text-davinci-002-render-sha",
+      "max_tokens": 4097,
+      "title": "Default (GPT-3.5)",
+      "description": "Optimized for speed, currently available to Plus users",
+      "tags": [],
+      "qualitative_properties": {
+        "reasoning": [
+          3,
+          5
+        ],
+        "speed": [
+          5,
+          5
+        ],
+        "conciseness": [
+          2,
+          5
+        ]
+      }
+    },
+    {
+      "slug": "text-davinci-002-render-paid",
+      "max_tokens": 4097,
+      "title": "Legacy (GPT-3.5)",
+      "description": "The previous ChatGPT Plus model",
+      "tags": [],
+      "qualitative_properties": {
+        "reasoning": [
+          3,
+          5
+        ],
+        "speed": [
+          2,
+          5
+        ],
+        "conciseness": [
+          1,
+          5
+        ]
+      }
+    },
+    {
+      "slug": "gpt-4",
+      "max_tokens": 4095,
+      "title": "GPT-4",
+      "description": "Our most advanced model, available to Plus subscribers.\n\nGPT-4 excels at tasks that require advanced reasoning, complex instruction understanding, and more creativity.",
+      "tags": [],
+      "qualitative_properties": {
+        "reasoning": [
+          5,
+          5
+        ],
+        "speed": [
+          2,
+          5
+        ],
+        "conciseness": [
+          4,
+          5
+        ]
+      }
+    }
+  ]
+}
