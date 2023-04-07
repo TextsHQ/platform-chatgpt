@@ -168,15 +168,20 @@ export default class OpenAI implements PlatformAPI {
     // 401 application/json {"detail":{"message":"Your authentication token has expired. Please try signing in again.","type":"invalid_request_error","param":null,"code":"token_expired"}}
     // 500 application/json {"detail":"Error getting system message: Invalid variable type: value should be str, int or float, got None of type <class 'NoneType'>"}
     texts.log(response.statusCode, ct, string)
-    const json = string.startsWith('<') ? string : JSON.parse(string)
+    const isHTML = string.startsWith('<')
+    const json = isHTML ? string : JSON.parse(string)
     const msg: Message = {
-      id: randomUUID(),
+      id: 'error-' + randomUUID(),
       timestamp: new Date(),
       text: json.detail?.message ?? json.detail ?? string,
       isAction: true,
       senderID: 'none',
     }
     if (typeof msg.text !== 'string') msg.text = string
+    if (isHTML) {
+      const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(string) || []
+      msg.text = `status code=${response.statusCode} content-type=${ct} title=${title}`
+    }
     if (convID) {
       this.pushEvent([{
         type: ServerEventType.USER_ACTIVITY,
