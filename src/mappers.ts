@@ -28,6 +28,12 @@ function parseTextAttributes(text: string, isPlugin: boolean): TextAttributes {
 
   const regex = /```\n([^]+?)\n```/g
   const entities: TextEntity[] = []
+  entities.push({
+    from: 0,
+    to: text.length,
+    markdown: text,
+  })
+  return { entities }
   const matches = text.matchAll(regex)
   for (const match of matches) {
     const from = toScalarIndex(match.index)
