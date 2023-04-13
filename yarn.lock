@@ -1695,7 +1695,7 @@ __metadata:
   resolution: "@textshq/platform-chatgpt@workspace:."
   dependencies:
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#main"
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#a5e14afd7736e9ed20e0ab9be7006c4611560261"
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#main"
     "@types/eslint": ^8.4.10
     "@types/form-data": ^2.5.0
     "@types/lodash": ^4.14.180
@@ -1711,13 +1711,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#a5e14afd7736e9ed20e0ab9be7006c4611560261":
+"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#main":
   version: 0.4.4
-  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=a5e14afd7736e9ed20e0ab9be7006c4611560261"
+  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=377194d2a7196f5d560c8c43c3b697da2d2cb7dc"
   dependencies:
     emoji-regex: ^10.1.0
     qrcode.react: ^3.1.0
-  checksum: 7fc9da005e46d233dd2235c0b9245429c35fd72608edc532baf4ace94e09de007225b3a1b9d6ff9c645be56111598cd90e061309077aa7651f3ac3c5da6fe054
+  checksum: 58c1d17ff37cca7ee14509652bf33e2def692bb2f8409ac36cdcfdc74c4abae0735d31afb8ac3f603ce494d1bf1a33ba6f1aa8748fbfcd559a45b4a2178a4adc
   languageName: node
   linkType: hard
 
