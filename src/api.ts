@@ -121,11 +121,11 @@ export default class OpenAI implements PlatformAPI {
       return { items: [], hasMore: false }
     }
     const conv = await this.api.conversations(pagination ? +pagination.cursor : undefined)
-    const items = (conv.items as any[]).map(t => mapThread(t, this.currentUser.id))
+    const items = conv.items.map(t => mapThread(t, this.currentUser.id))
     return {
       items,
       hasMore: conv.items.length === conv.limit,
-      oldestCursor: conv.offset + conv.limit,
+      oldestCursor: String(conv.offset + conv.limit),
     }
   }
 

@@ -63,7 +63,13 @@ export default class OpenAIAPI {
     this.call('backend-api/aip/p', undefined, { searchParams: { offset, limit, is_installed: String(isInstalled) } })
 
   conversations = (offset = 0, limit = 20) =>
-    this.call('backend-api/conversations', undefined, { searchParams: { offset, limit } })
+    this.call<{
+      items: ChatGPTConv[]
+      total: number
+      limit: number
+      offset: number
+      has_missing_conversations: boolean
+    }>('backend-api/conversations', undefined, { searchParams: { offset, limit } })
 
   conversation = (id: string) =>
     this.call<ChatGPTConv>(`backend-api/conversation/${id}`)
