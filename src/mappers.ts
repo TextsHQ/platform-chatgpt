@@ -23,60 +23,50 @@ export function mapModel(model: Model): User {
   }
 }
 
-function parseTextAttributes(text: string, isPlugin: boolean): TextAttributes {
-  const toScalarIndex = (idx: number) => Array.from(text.substring(0, idx)).length
-
-  const regex = /```\n([^]+?)\n```/g
-  const entities: TextEntity[] = []
-  entities.push({
-    from: 0,
-    to: text.length,
-    markdown: text,
-  })
-  return { entities }
-  const matches = text.matchAll(regex)
-  for (const match of matches) {
-    const from = toScalarIndex(match.index)
-    const to = toScalarIndex(match.index + match[0].length)
-    entities.push({
-      from,
-      to,
-      code: true,
-      pre: true,
-      codeLanguage: 'auto',
-    })
-    entities.push({
-      from,
-      to: from + 4,
-      replaceWith: '',
-    })
-    entities.push({
-      from: to - 3,
-      to,
-      replaceWith: '',
-    })
-  }
+function getTextEntities(text: string, isPlugin: boolean): TextEntity {
   if (isPlugin) {
-    entities.push({
+    return {
       from: 0,
       to: text.length,
       code: true,
       pre: true,
       // codeLanguage: text[0] === '{' ? 'javascript' : undefined,
-    })
+    }
   }
-  if (!entities.length) return
-  return { entities }
+  return {
+    from: 0,
+    to: text.length,
+    markdown: text,
+  }
 }
 
 export function mapMessage(message: ChatGPTMessage, currentUserID: string): Message {
   if (!message.message?.create_time) return
   const textHeading = (() => {
-    if (message.message.recipient !== 'all' && message.message.author.role === 'assistant') return `Response to ${message.message.recipient?.split('.', 1)?.[0]}`
+    if (message.message.recipient !== 'all' && message.message.author.role === 'assistant') return `Request to ${message.message.recipient?.split('.', 1)?.[0]}`
     if (message.message.author.role === 'tool') return `Response from ${message.message.author.name?.split('.', 1)?.[0]}`
   })()
   const text = (() => {
-    const txt = message.message.content?.parts?.join('\n')
+    const txt = (() => {
+      const { content } = message.message
+      switch (content?.content_type) {
+        case 'text':
+          return content.parts?.join('\n')
+        case 'code':
+        case 'tether_browsing_code':
+        case 'execution_output':
+          return content.text
+        case 'system_error':
+          return content.text
+        case 'system_message':
+          return content.text
+        case 'tether_browsing_display':
+          return content.result
+        case 'tether_quote':
+          return content.text
+        default:
+      }
+    })()
     if (textHeading) {
       const json = tryParseJSON(txt)
       if (json) return JSON.stringify(json, null, 2)
@@ -84,7 +74,7 @@ export function mapMessage(message: ChatGPTMessage, currentUserID: string): Mess
     return txt
   })()
   const textAttributes = text
-    ? parseTextAttributes(text, !!textHeading)
+    ? { entities: [getTextEntities(text, !!textHeading)] }
     : undefined
   const isSender = message.message.author.role === 'user'
   const modelSlug = message.message?.metadata.model_slug

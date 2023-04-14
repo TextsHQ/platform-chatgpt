@@ -20,7 +20,28 @@ export interface ChatGPTMessage {
     recipient?: string
     author: Author
     content?: {
-      parts?: string[]
+      content_type: 'text'
+      parts: string[]
+    } | {
+      content_type: 'code' | 'tether_browsing_code' | 'execution_output'
+      language: string
+      text: string
+    } | {
+      content_type: 'tether_quote'
+      url: string
+      domain: string
+      text: string
+      title: string
+    } | {
+      content_type: 'tether_browsing_display'
+      result: string
+      summary: string
+    } | {
+      content_type: 'system_error'
+      text: string
+    } | {
+      content_type: 'system_message'
+      text: string
     }
     create_time?: number
     metadata?: {
