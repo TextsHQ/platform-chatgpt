@@ -1,6 +1,7 @@
 import fs from 'fs'
 import FormData from 'form-data'
 import { FetchOptions, texts } from '@textshq/platform-sdk'
+import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import type { CookieJar } from 'tough-cookie'
 
 import { ChatGPTConv } from './interfaces'
@@ -36,8 +37,7 @@ export default class OpenAIAPI {
     const res = await this.http.requestAsString(url, opts)
     if (res.body[0] === '<') {
       console.log(res.statusCode, url, res.body)
-      const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(res.body) || []
-      throw Error(`expected json, got html, status code=${res.statusCode}, title=${title}`)
+      throw new ExpectedJSONGotHTMLError(res.statusCode, res.body)
     } else if (res.body.startsWith('Internal')) {
       console.log(res.statusCode, url, res.body)
       throw Error(res.body)

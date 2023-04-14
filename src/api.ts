@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { CookieJar } from 'tough-cookie'
 import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, ReAuthError, ThreadFolderName, LoginCreds, ThreadID, UserID, MessageID } from '@textshq/platform-sdk'
-import { tryParseJSON } from '@textshq/platform-sdk/dist/json'
+import { htmlTitleRegex, tryParseJSON } from '@textshq/platform-sdk/dist/json'
 import type { IncomingMessage } from 'http'
 import type EventEmitter from 'events'
 
@@ -179,7 +179,7 @@ export default class OpenAI implements PlatformAPI {
     }
     if (typeof msg.text !== 'string') msg.text = string
     if (isHTML) {
-      const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(string) || []
+      const [, title] = htmlTitleRegex.exec(string) || []
       msg.text = `status code=${response.statusCode} content-type=${ct} title=${title}`
     }
     if (convID) {
