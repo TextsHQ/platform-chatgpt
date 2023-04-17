@@ -96,7 +96,7 @@ export default class OpenAIAPI {
     return {
       accept: '*/*',
       'accept-language': 'en',
-      'sec-ch-ua': '"Google Chrome";v="111", "Not(A:Brand";v="8", "Chromium";v="111"',
+      'sec-ch-ua': '"Google Chrome";v="112", "Not(A:Brand";v="8", "Chromium";v="112"',
       'sec-ch-ua-mobile': '?0',
       'sec-ch-ua-platform': '"macOS"',
       'sec-fetch-dest': 'empty',
