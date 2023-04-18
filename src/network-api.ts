@@ -92,6 +92,17 @@ export default class OpenAIAPI {
     })
   }
 
+  csrf = () =>
+    this.call<{ csrfToken: string }>('api/auth/csrf')
+
+  signout = async () => {
+    const { csrfToken } = await this.csrf()
+    return this.call('api/auth/signout', { csrfToken, callbackUrl: 'https://chat.openai.com/api/auth/logout', json: true }, { method: 'POST' })
+  }
+
+  logout = () =>
+    this.call('api/auth/logout')
+
   get headers() {
     return {
       accept: '*/*',

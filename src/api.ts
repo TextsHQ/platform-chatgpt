@@ -49,7 +49,10 @@ export default class OpenAI implements PlatformAPI {
     authMethod: this.api.authMethod ?? 'login-window',
   })
 
-  logout = () => {}
+  logout = async () => {
+    await this.api.signout()
+    await this.api.logout()
+  }
 
   dispose = () => {}
 
