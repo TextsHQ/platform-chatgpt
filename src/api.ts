@@ -20,9 +20,10 @@ export default class OpenAI implements PlatformAPI {
 
   init = async (session: SerializedSession) => {
     if (!session) return
-    const { jar, ua, authMethod } = session
+    const { jar, ua, headers, authMethod } = session
     this.api.jar = CookieJar.fromJSON(jar)
     this.api.ua = ua
+    this.api.customHeaders = headers
     this.api.authMethod = authMethod
     await this.fetchSession()
   }

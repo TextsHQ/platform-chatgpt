@@ -17,6 +17,8 @@ export default class OpenAIAPI {
 
   ua = texts.constants.USER_AGENT
 
+  customHeaders?: Record<string, string>
+
   authMethod: 'login-window' | 'extension' = 'login-window'
 
   private accessToken: string
@@ -139,7 +141,7 @@ export default class OpenAIAPI {
     this.call('api/auth/logout')
 
   get headers() {
-    return {
+    return this.customHeaders ?? {
       accept: '*/*',
       'accept-language': 'en',
       'sec-ch-ua': '"Google Chrome";v="112", "Not(A:Brand";v="8", "Chromium";v="112"',
