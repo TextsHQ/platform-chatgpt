@@ -23,15 +23,15 @@ export default class OpenAIAPI {
 
   private cfChallengeInProgress: boolean
 
-  private cfChallenge = async (url: string) => {
+  private cfChallenge = async () => {
     this.cfChallengeInProgress = true
+    console.log('cf challenge')
+    console.time('cf challenge')
     try {
-      console.log('cf challenge')
-      console.time('cf challenge')
-      const closeJS = 'if (!window._cf_chl_opt) window.close()'
+      const closeJS = 'if (!window._cf_chl_opt) setTimeout(() => window.close(), 900)'
       // todo: add timeout or this will never resolve
       const result = await texts.openBrowserWindow({
-        url,
+        url: ENDPOINT,
         cookieJar: this.jar.toJSON(),
         userAgent: ELECTRON_UA,
         runJSOnLaunch: closeJS,
@@ -39,10 +39,11 @@ export default class OpenAIAPI {
         isHidden: true,
       })
       this.ua = ELECTRON_UA
-      console.timeEnd('cf challenge')
       const cj = CookieJar.fromJSON(result.cookieJar as any)
       this.jar = cj
+      this.authMethod = 'login-window'
     } finally {
+      console.timeEnd('cf challenge')
       this.cfChallengeInProgress = false
     }
   }
@@ -67,11 +68,11 @@ export default class OpenAIAPI {
     const url = `${ENDPOINT}${pathname}`
     const res = await this.http.requestAsString(url, opts)
     if (res.body[0] === '<') {
-      console.log(res.statusCode, url, res.body)
       if (res.statusCode === 403 && !attempt) {
-        await this.cfChallenge(url)
+        await this.cfChallenge()
         return this.call<ResultType>(pathname, jsonBody, optOverrides, (attempt || 0) + 1)
       }
+      console.log(res.statusCode, url, res.body)
       throw new ExpectedJSONGotHTMLError(res.statusCode, res.body)
     } else if (res.body.startsWith('Internal')) {
       console.log(res.statusCode, url, res.body)
