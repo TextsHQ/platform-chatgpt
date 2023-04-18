@@ -27,10 +27,11 @@ export default class OpenAI implements PlatformAPI {
     await this.fetchSession()
   }
 
-  login = async ({ cookieJarJSON, jsCodeResult }: LoginCreds): Promise<LoginResult> => {
+  login = async (creds: LoginCreds): Promise<LoginResult> => {
+    const cookieJarJSON = 'cookieJarJSON' in creds && creds.cookieJarJSON
     if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
-    if (jsCodeResult) {
-      const { ua, authMethod } = JSON.parse(jsCodeResult)
+    if (creds.jsCodeResult) {
+      const { ua, authMethod } = JSON.parse(creds.jsCodeResult)
       this.api.ua = ua
       this.api.authMethod = authMethod || 'login-window'
     }

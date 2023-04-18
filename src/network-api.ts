@@ -1,10 +1,12 @@
 import fs from 'fs'
+import { setTimeout } from 'timers/promises'
 import FormData from 'form-data'
 import { FetchOptions, texts } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
-import type { CookieJar } from 'tough-cookie'
+import { CookieJar } from 'tough-cookie'
 
 import { ChatGPTConv } from './interfaces'
+import { ELECTRON_UA } from './constants'
 
 const ENDPOINT = 'https://chat.openai.com/'
 
@@ -19,7 +21,36 @@ export default class OpenAIAPI {
 
   private accessToken: string
 
-  private async call<ResultType = any>(pathname: string, jsonBody?: any, optOverrides?: Partial<FetchOptions>) {
+  private cfChallengeInProgress: boolean
+
+  private cfChallenge = async (url: string) => {
+    this.cfChallengeInProgress = true
+    try {
+      console.log('cf challenge')
+      console.time('cf challenge')
+      const closeJS = 'if (!window._cf_chl_opt) window.close()'
+      // todo: add timeout or this will never resolve
+      const result = await texts.openBrowserWindow({
+        url,
+        cookieJar: this.jar.toJSON(),
+        userAgent: ELECTRON_UA,
+        runJSOnLaunch: closeJS,
+        runJSOnNavigate: closeJS,
+        isHidden: true,
+      })
+      this.ua = ELECTRON_UA
+      console.timeEnd('cf challenge')
+      const cj = CookieJar.fromJSON(result.cookieJar as any)
+      this.jar = cj
+    } finally {
+      this.cfChallengeInProgress = false
+    }
+  }
+
+  private async call<ResultType = any>(pathname: string, jsonBody?: any, optOverrides?: Partial<FetchOptions>, attempt?: number): Promise<ResultType> {
+    while (this.cfChallengeInProgress) {
+      await setTimeout(100)
+    }
     const isBackendAPI = pathname.startsWith('backend-api')
     if (isBackendAPI && !this.accessToken) throw Error('no accessToken')
     const opts: FetchOptions = {
@@ -37,6 +68,10 @@ export default class OpenAIAPI {
     const res = await this.http.requestAsString(url, opts)
     if (res.body[0] === '<') {
       console.log(res.statusCode, url, res.body)
+      if (res.statusCode === 403 && !attempt) {
+        await this.cfChallenge(url)
+        return this.call<ResultType>(pathname, jsonBody, optOverrides, (attempt || 0) + 1)
+      }
       throw new ExpectedJSONGotHTMLError(res.statusCode, res.body)
     } else if (res.body.startsWith('Internal')) {
       console.log(res.statusCode, url, res.body)
