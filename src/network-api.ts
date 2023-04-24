@@ -6,12 +6,14 @@ import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { CookieJar } from 'tough-cookie'
 
 import { ChatGPTConv } from './interfaces'
-import { ELECTRON_UA } from './constants'
+import { ELECTRON_UA, CLOSE_ON_AUTHENTICATED_JS } from './constants'
 
 const ENDPOINT = 'https://chat.openai.com/'
 
 export default class OpenAIAPI {
   private http = texts.createHttpClient()
+
+  constructor(private readonly accountID: string) {}
 
   jar: CookieJar
 
@@ -28,15 +30,13 @@ export default class OpenAIAPI {
     console.log('cf challenge')
     console.time('cf challenge')
     try {
-      const closeJS = 'if (!window._cf_chl_opt) setTimeout(() => window.close(), 900)'
       // todo: add timeout or this will never resolve
-      const result = await texts.openBrowserWindow({
+      const result = await texts.openBrowserWindow(this.accountID, {
         url: ENDPOINT,
         cookieJar: this.jar.toJSON(),
         userAgent: ELECTRON_UA,
-        runJSOnLaunch: closeJS,
-        runJSOnNavigate: closeJS,
-        isHidden: true,
+        runJSOnLaunch: CLOSE_ON_AUTHENTICATED_JS,
+        runJSOnNavigate: CLOSE_ON_AUTHENTICATED_JS,
       })
       this.ua = ELECTRON_UA
       const cj = CookieJar.fromJSON(result.cookieJar as any)
@@ -59,8 +59,8 @@ export default class OpenAIAPI {
       headers: {
         ...(isBackendAPI && { Authorization: `Bearer ${this.accessToken}` }),
         ...(jsonBody && { 'Content-Type': 'application/json' }),
-        Referer: 'https://chat.openai.com/chat',
         ...this.headers,
+        Referer: 'https://chat.openai.com/',
       },
       cookieJar: this.jar,
       ...optOverrides,
@@ -143,7 +143,7 @@ export default class OpenAIAPI {
     return {
       accept: '*/*',
       'accept-language': 'en',
-      'sec-ch-ua': '"Google Chrome";v="112", "Not(A:Brand";v="8", "Chromium";v="112"',
+      'sec-ch-ua': '"Not:A-Brand";v="99", "Chromium";v="112"',
       'sec-ch-ua-mobile': '?0',
       'sec-ch-ua-platform': '"macOS"',
       'sec-fetch-dest': 'empty',
@@ -169,7 +169,7 @@ export default class OpenAIAPI {
       authorization: `Bearer ${this.accessToken}`,
       'content-type': 'application/json',
       cookie: this.jar.getCookieStringSync(url),
-      referer: conversationID ? `https://chat.openai.com/chat/${conversationID}` : 'https://chat.openai.com/chat',
+      referer: conversationID ? `https://chat.openai.com/c/${conversationID}` : 'https://chat.openai.com/',
     }
     const body = {
       action: 'next',
