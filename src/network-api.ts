@@ -17,8 +17,6 @@ export default class OpenAIAPI {
 
   ua = texts.constants.USER_AGENT
 
-  customHeaders?: Record<string, string>
-
   authMethod: 'login-window' | 'extension' = 'login-window'
 
   private accessToken: string
@@ -60,7 +58,7 @@ export default class OpenAIAPI {
       headers: {
         ...(isBackendAPI && { Authorization: `Bearer ${this.accessToken}` }),
         ...(jsonBody && { 'Content-Type': 'application/json' }),
-        Referer: 'https://chat.openai.com/chat',
+        Referer: 'https://chat.openai.com/',
         ...this.headers,
       },
       cookieJar: this.jar,
@@ -141,15 +139,31 @@ export default class OpenAIAPI {
     this.call('api/auth/logout')
 
   get headers() {
-    return this.customHeaders ?? {
+    // crude safari UA detection
+    if (this.ua.includes('Safari/6') && this.ua.includes('Version/1')) {
+      return {
+        Accept: '*/*',
+        'Accept-Encoding': 'gzip,deflate,br',
+        'Accept-Language': 'en-US,en;q=0.9',
+        Connection: 'keep-alive',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'User-Agent': this.ua,
+      }
+    }
+
+    return {
       accept: '*/*',
-      'accept-language': 'en',
+      'accept-encoding': 'gzip,deflate,br',
+      'accept-language': 'en-US,en;q=0.9',
       'sec-ch-ua': '"Google Chrome";v="112", "Not(A:Brand";v="8", "Chromium";v="112"',
       'sec-ch-ua-mobile': '?0',
       'sec-ch-ua-platform': '"macOS"',
       'sec-fetch-dest': 'empty',
       'sec-fetch-mode': 'cors',
       'sec-fetch-site': 'same-origin',
+      'sec-gpc': '1',
       'user-agent': this.ua,
     }
   }
