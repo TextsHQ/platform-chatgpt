@@ -16,7 +16,9 @@ export default class OpenAI implements PlatformAPI {
 
   private pushEvent: OnServerEventCallback
 
-  private api = new OpenAIAPI()
+  constructor(private readonly accountID: string) { }
+
+  private api = new OpenAIAPI(this.accountID)
 
   init = async (session: SerializedSession) => {
     if (!session) return

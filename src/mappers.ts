@@ -1,4 +1,4 @@
-import { Message, MessageBehavior, TextAttributes, TextEntity, Thread, ThreadID, User } from '@textshq/platform-sdk'
+import { Message, MessageBehavior, TextEntity, Thread, ThreadID, User } from '@textshq/platform-sdk'
 import { tryParseJSON } from '@textshq/platform-sdk/dist/json'
 import { ChatGPTConv, ChatGPTMessage, Model } from './interfaces'
 
