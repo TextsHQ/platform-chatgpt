@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { CookieJar } from 'tough-cookie'
-import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, ReAuthError, ThreadFolderName, LoginCreds, ThreadID, UserID, MessageID } from '@textshq/platform-sdk'
+import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, ReAuthError, ThreadFolderName, LoginCreds, ThreadID, UserID, MessageID, ClientContext } from '@textshq/platform-sdk'
 import { htmlTitleRegex, tryParseJSON } from '@textshq/platform-sdk/dist/json'
 import type { IncomingMessage } from 'http'
 import type EventEmitter from 'events'
@@ -8,19 +8,23 @@ import type EventEmitter from 'events'
 import OpenAIAPI from './network-api'
 import { Plugin, Model } from './interfaces'
 import { mapMessage, mapModel, mapThread } from './mappers'
+import type PlatformInfo from './info'
 
 const DEFAULT_MODEL = 'text-davinci-002-render-sha'
 
-export default class OpenAI implements PlatformAPI {
+export default class ChatGPT implements PlatformAPI {
   private currentUser: CurrentUser
 
   private pushEvent: OnServerEventCallback
 
-  constructor(private readonly accountID: string) { }
+  historyAndTrainingDisabled: boolean
 
-  private api = new OpenAIAPI(this.accountID)
+  constructor(readonly accountID: string) {}
 
-  init = async (session: SerializedSession) => {
+  private api = new OpenAIAPI(this)
+
+  init = async (session: SerializedSession, _: ClientContext, prefs: Record<keyof typeof PlatformInfo['prefs'], string | boolean>) => {
+    this.historyAndTrainingDisabled = !!prefs.history_and_training_disabled
     if (!session) return
     const { jar, ua, authMethod } = session
     this.api.jar = CookieJar.fromJSON(jar)

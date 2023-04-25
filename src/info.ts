@@ -26,6 +26,14 @@ const info: PlatformInfo = {
   attachments: {
     noSupport: true,
   },
+  prefs: {
+    history_and_training_disabled: {
+      label: 'Chat History & Training',
+      description: 'Save new chats to your history and allow them to be used to improve ChatGPT via model training. Unsaved chats will be deleted from OpenAI systems within 30 days.',
+      type: 'checkbox',
+      default: true,
+    },
+  },
 }
 
 export default info

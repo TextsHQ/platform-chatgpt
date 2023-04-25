@@ -7,13 +7,14 @@ import { CookieJar } from 'tough-cookie'
 
 import { ChatGPTConv } from './interfaces'
 import { ELECTRON_UA, CLOSE_ON_AUTHENTICATED_JS } from './constants'
+import type ChatGPT from './api'
 
 const ENDPOINT = 'https://chat.openai.com/'
 
 export default class OpenAIAPI {
-  private http = texts.createHttpClient()
+  constructor(private readonly papi: ChatGPT) { }
 
-  constructor(private readonly accountID: string) {}
+  private http = texts.createHttpClient()
 
   jar: CookieJar
 
@@ -31,7 +32,7 @@ export default class OpenAIAPI {
     console.time('cf challenge')
     try {
       // todo: add timeout or this will never resolve
-      const result = await texts.openBrowserWindow(this.accountID, {
+      const result = await texts.openBrowserWindow(this.papi.accountID, {
         url: ENDPOINT,
         cookieJar: this.jar.toJSON(),
         userAgent: ELECTRON_UA,
@@ -184,6 +185,8 @@ export default class OpenAIAPI {
       model,
       plugin_ids: pluginIDs,
       timezone_offset_min: new Date().getTimezoneOffset(),
+      variant_purpose: 'none',
+      history_and_training_disabled: this.papi.historyAndTrainingDisabled,
     }
     const stream = await texts.fetchStream(url, {
       method: 'POST',
