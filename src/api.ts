@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto'
-import { CookieJar } from 'tough-cookie'
 import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, ReAuthError, ThreadFolderName, LoginCreds, ThreadID, UserID, MessageID, ClientContext } from '@textshq/platform-sdk'
 import { htmlTitleRegex, tryParseJSON } from '@textshq/platform-sdk/dist/json'
 import type { IncomingMessage } from 'http'
@@ -19,29 +18,27 @@ export default class ChatGPT implements PlatformAPI {
 
   historyAndTrainingDisabled: boolean
 
+  sessionID: string
+
   constructor(readonly accountID: string) {}
 
   private api = new OpenAIAPI(this)
 
   init = async (session: SerializedSession, _: ClientContext, prefs: Record<keyof typeof PlatformInfo['prefs'], string | boolean>) => {
     this.historyAndTrainingDisabled = !!prefs.history_and_training_disabled
+    this.sessionID = session?.sessionID || this.accountID
     if (!session) return
-    const { jar, ua, authMethod } = session
-    this.api.jar = CookieJar.fromJSON(jar)
-    this.api.ua = ua
-    this.api.authMethod = authMethod
+    this.api.authMethod = session.authMethod
     await this.fetchSession()
   }
 
   login = async (creds: LoginCreds): Promise<LoginResult> => {
-    const cookieJarJSON = 'cookieJarJSON' in creds && creds.cookieJarJSON
-    if (!cookieJarJSON) return { type: 'error', errorMessage: 'Cookies not found' }
+    if (!('jsCodeResult' in creds)) throw Error('!jsCodeResult')
     if (creds.jsCodeResult) {
-      const { ua, authMethod } = JSON.parse(creds.jsCodeResult)
-      this.api.ua = ua
+      const { authMethod } = JSON.parse(creds.jsCodeResult)
+      if (authMethod === 'extension') throw Error('no support for extension login atm')
       this.api.authMethod = authMethod || 'login-window'
     }
-    this.api.jar = CookieJar.fromJSON(cookieJarJSON as any)
     // if (texts.IS_DEV) {
     //   const cookie = this.api.jar.getCookieStringSync('https://chat.openai.com/api/auth/session')
     //   console.log({ cookie })
@@ -51,8 +48,7 @@ export default class ChatGPT implements PlatformAPI {
   }
 
   serializeSession = () => ({
-    jar: this.api.jar.toJSON(),
-    ua: this.api.ua,
+    sessionID: this.sessionID,
     authMethod: this.api.authMethod ?? 'login-window',
   })
 

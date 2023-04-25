@@ -3,7 +3,6 @@ import { setTimeout } from 'timers/promises'
 import FormData from 'form-data'
 import { FetchOptions, texts } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
-import { CookieJar } from 'tough-cookie'
 
 import { ChatGPTConv } from './interfaces'
 import { ELECTRON_UA, CLOSE_ON_AUTHENTICATED_JS } from './constants'
@@ -11,14 +10,32 @@ import type ChatGPT from './api'
 
 const ENDPOINT = 'https://chat.openai.com/'
 
+export const makeMutex = () => {
+  let task = Promise.resolve() as Promise<any>
+  return {
+    mutex<T>(code: () => Promise<T>): Promise<T> {
+      task = (async () => {
+        // wait for the previous task to complete
+        // if there is an error, we swallow so as to not block the queue
+        try {
+          await task
+        } catch {
+          // do nothing
+        }
+        // execute the current task
+        return code()
+      })()
+      // we replace the existing task, appending the new piece of execution to it
+      // so the next task will have to wait for this one to finish
+      return task
+    },
+  }
+}
+
+const { mutex } = makeMutex()
+
 export default class OpenAIAPI {
-  constructor(private readonly papi: ChatGPT) { }
-
-  private http = texts.createHttpClient()
-
-  jar: CookieJar
-
-  ua = texts.constants.USER_AGENT
+  constructor(private readonly papi: ChatGPT) {}
 
   authMethod: 'login-window' | 'extension' = 'login-window'
 
@@ -32,16 +49,12 @@ export default class OpenAIAPI {
     console.time('cf challenge')
     try {
       // todo: add timeout or this will never resolve
-      const result = await texts.openBrowserWindow(this.papi.accountID, {
+      await texts.openBrowserWindow(this.papi.accountID, {
         url: ENDPOINT,
-        cookieJar: this.jar.toJSON(),
         userAgent: ELECTRON_UA,
         runJSOnLaunch: CLOSE_ON_AUTHENTICATED_JS,
         runJSOnNavigate: CLOSE_ON_AUTHENTICATED_JS,
       })
-      this.ua = ELECTRON_UA
-      const cj = CookieJar.fromJSON(result.cookieJar as any)
-      this.jar = cj
       this.authMethod = 'login-window'
     } finally {
       console.timeEnd('cf challenge')
@@ -60,26 +73,28 @@ export default class OpenAIAPI {
       headers: {
         ...(isBackendAPI && { Authorization: `Bearer ${this.accessToken}` }),
         ...(jsonBody && { 'Content-Type': 'application/json' }),
-        ...this.headers,
         Referer: 'https://chat.openai.com/',
+        // ...this.headers,
       },
-      cookieJar: this.jar,
       ...optOverrides,
     }
     const url = `${ENDPOINT}${pathname}`
-    const res = await this.http.requestAsString(url, opts)
-    if (res.body[0] === '<') {
+    console.log('call nativefetch', url)
+    const res = await mutex(() => texts.nativeFetch(this.papi.sessionID, url, opts))
+    console.log('return nativefetch', url)
+    const body = Buffer.from(res.body).toString()
+    if (body[0] === '<') {
       if (res.statusCode === 403 && !attempt) {
         await this.cfChallenge()
         return this.call<ResultType>(pathname, jsonBody, optOverrides, (attempt || 0) + 1)
       }
-      console.log(res.statusCode, url, res.body)
-      throw new ExpectedJSONGotHTMLError(res.statusCode, res.body)
-    } else if (res.body.startsWith('Internal')) {
-      console.log(res.statusCode, url, res.body)
-      throw Error(res.body)
+      console.log(res.statusCode, url, body)
+      throw new ExpectedJSONGotHTMLError(res.statusCode, body)
+    } else if (body.startsWith('Internal')) {
+      console.log(res.statusCode, url, body)
+      throw Error(body)
     }
-    const json = JSON.parse(res.body)
+    const json = JSON.parse(body)
     if (json.detail) { // potential error
       texts.error(url, json.detail)
     }
@@ -150,7 +165,7 @@ export default class OpenAIAPI {
       'sec-fetch-dest': 'empty',
       'sec-fetch-mode': 'cors',
       'sec-fetch-site': 'same-origin',
-      'user-agent': this.ua,
+      'user-agent': ELECTRON_UA,
     }
   }
 
@@ -169,7 +184,7 @@ export default class OpenAIAPI {
       accept: 'text/event-stream',
       authorization: `Bearer ${this.accessToken}`,
       'content-type': 'application/json',
-      cookie: this.jar.getCookieStringSync(url),
+      // cookie: this.jar.getCookieStringSync(url),
       referer: conversationID ? `https://chat.openai.com/c/${conversationID}` : 'https://chat.openai.com/',
     }
     const body = {
@@ -188,9 +203,8 @@ export default class OpenAIAPI {
       variant_purpose: 'none',
       history_and_training_disabled: this.papi.historyAndTrainingDisabled,
     }
-    const stream = await texts.fetchStream(url, {
+    const stream = await texts.nativeFetchStream(this.papi.sessionID, url, {
       method: 'POST',
-      cookieJar: this.jar,
       headers,
       body: JSON.stringify(body),
     })
