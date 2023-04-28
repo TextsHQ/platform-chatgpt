@@ -106,9 +106,8 @@ export default class ChatGPT implements PlatformAPI {
     const threadID = await new Promise<string>(resolve => {
       this.postMessage({
         model: modelID,
-        guid: randomUUID(),
+        messages: [OpenAIAPI.generateMessage(randomUUID(), message)],
         parentMessageID: randomUUID(),
-        text: message,
         pluginIDs,
         conversationID: undefined,
       }, tid => resolve(tid))
@@ -213,10 +212,10 @@ export default class ChatGPT implements PlatformAPI {
     }
   }
 
-  private postMessage = async ({ model, conversationID, guid, text, parentMessageID, pluginIDs }: Parameters<typeof this.api.postMessage>[0], convIDCallback?: (threadID: ThreadID) => void) => {
+  private postMessage = async ({ model, conversationID, messages, parentMessageID, pluginIDs }: Parameters<typeof this.api.postMessage>[0], convIDCallback?: (threadID: ThreadID) => void) => {
     let convID = conversationID
     let calledConvIDCallback = false
-    const stream = await this.api.postMessage({ model, conversationID: convID, guid, text, parentMessageID, pluginIDs })
+    const stream = await this.api.postMessage({ model, conversationID: convID, messages, parentMessageID, pluginIDs })
     let response: IncomingMessage
     (stream as EventEmitter).on('response', (res: IncomingMessage) => {
       response = res
@@ -302,16 +301,10 @@ export default class ChatGPT implements PlatformAPI {
         }])
         throw Error(JSON.stringify(res))
       } else if (Array.isArray(res)) {
-        this.pushEvent(res.map(message => ({
-          type: ServerEventType.STATE_SYNC,
-          objectName: 'message',
-          mutationType: 'upsert',
-          objectIDs: { threadID: message.conversation_id },
-          entries: [mapMessage(message, this.currentUser.id)],
-        })))
+        await this.postMessage({ model, conversationID: threadID, messages: res, parentMessageID })
       }
     } else {
-      await this.postMessage({ model, conversationID: threadID, guid: pendingMessageID, text, parentMessageID })
+      await this.postMessage({ model, conversationID: threadID, messages: [OpenAIAPI.generateMessage(pendingMessageID, text)], parentMessageID })
     }
     return [userMessage]
   }

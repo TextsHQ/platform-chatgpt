@@ -154,11 +154,17 @@ export default class OpenAIAPI {
     }
   }
 
-  async postMessage({ model, conversationID, guid, text, pluginIDs, parentMessageID }: {
+  static generateMessage = (guid: string, text: string) => ({
+    id: guid,
+    author: { role: 'user' },
+    role: 'user',
+    content: { content_type: 'text', parts: [text] },
+  })
+
+  async postMessage({ model, conversationID, messages, pluginIDs, parentMessageID }: {
     model: string
     conversationID: string | undefined
-    guid: string
-    text: string
+    messages: any[]
     pluginIDs?: string[]
     parentMessageID: string
   }) {
@@ -174,12 +180,7 @@ export default class OpenAIAPI {
     }
     const body = {
       action: 'next',
-      messages: [{
-        id: guid,
-        author: { role: 'user' },
-        role: 'user',
-        content: { content_type: 'text', parts: [text] },
-      }],
+      messages,
       conversation_id: conversationID,
       parent_message_id: parentMessageID,
       model,
