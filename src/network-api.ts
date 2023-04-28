@@ -39,6 +39,7 @@ export default class OpenAIAPI {
         runJSOnLaunch: CLOSE_ON_AUTHENTICATED_JS,
         runJSOnNavigate: CLOSE_ON_AUTHENTICATED_JS,
       })
+      if (!result.cookieJar) return
       this.ua = ELECTRON_UA
       const cj = CookieJar.fromJSON(result.cookieJar as any)
       this.jar = cj
