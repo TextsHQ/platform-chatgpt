@@ -173,22 +173,22 @@ export default class ChatGPT implements PlatformAPI {
     }
   }
 
-  private handleSendError = (response: IncomingMessage, ct: string, string: string, convID: string | undefined) => {
+  private handleSendError = (response: IncomingMessage, ct: string, resString: string, convID: string | undefined) => {
     // 401 application/json {"detail":{"message":"Your authentication token has expired. Please try signing in again.","type":"invalid_request_error","param":null,"code":"token_expired"}}
     // 500 application/json {"detail":"Error getting system message: Invalid variable type: value should be str, int or float, got None of type <class 'NoneType'>"}
-    texts.log(response.statusCode, ct, string)
-    const isHTML = string.startsWith('<')
-    const json = isHTML ? string : JSON.parse(string)
+    texts.log(response.statusCode, ct, resString)
+    const isHTML = resString.startsWith('<') || ct.includes('text/html')
+    const json = isHTML ? resString : JSON.parse(resString)
     const msg: Message = {
       id: 'error-' + randomUUID(),
       timestamp: new Date(),
-      text: json.detail?.message ?? json.detail ?? string,
+      text: json.detail?.message ?? json.detail ?? resString,
       isAction: true,
       senderID: 'none',
     }
-    if (typeof msg.text !== 'string') msg.text = string
+    if (typeof msg.text !== 'string') msg.text = resString
     if (isHTML) {
-      const [, title] = htmlTitleRegex.exec(string) || []
+      const [, title] = htmlTitleRegex.exec(resString) || []
       msg.text = `status code=${response.statusCode} content-type=${ct} title=${title}`
     }
     if (convID) {
@@ -221,12 +221,16 @@ export default class ChatGPT implements PlatformAPI {
       response = res
     })
     let messageID: MessageID
+    const chunks: Buffer[] = []
     stream.on('data', (chunk: Buffer) => {
       const string = chunk.toString()
       // texts.log(string)
       if (string === '[DONE]') return
       const ct = response.headers['content-type']
-      if (!ct.includes('text/event-stream')) return this.handleSendError(response, ct, string, convID)
+      if (!ct.includes('text/event-stream')) {
+        chunks.push(chunk)
+        return
+      }
       const parsed = string
         .split('data: ')
         .map(l => l.trim())
@@ -252,8 +256,11 @@ export default class ChatGPT implements PlatformAPI {
         convID = parsed[0]?.conversation_id
       }
     })
-    stream.on('end', async (chunk: Buffer) => {
-      const string = chunk?.toString()
+    stream.on('end', async () => {
+      const ct = response.headers['content-type']
+      if (!ct.includes('text/event-stream')) {
+        return this.handleSendError(response, ct, Buffer.concat(chunks).toString(), convID)
+      }
       // texts.log('postMessage end', string)
       if (!conversationID && messageID) {
         const { title } = await this.api.genTitle(convID, messageID)
