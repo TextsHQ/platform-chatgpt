@@ -35,6 +35,27 @@
       }
     },
     {
+      "slug": "gpt-4",
+      "max_tokens": 4095,
+      "title": "GPT-4",
+      "description": "Our most advanced model, available to Plus subscribers.\n\nGPT-4 excels at tasks that require advanced reasoning, complex instruction understanding, and more creativity.",
+      "tags": [],
+      "qualitative_properties": {
+        "reasoning": [
+          5,
+          5
+        ],
+        "speed": [
+          2,
+          5
+        ],
+        "conciseness": [
+          4,
+          5
+        ]
+      }
+    },
+    {
       "slug": "text-davinci-002-render-paid",
       "max_tokens": 4097,
       "title": "Legacy (GPT-3.5)",
@@ -56,25 +77,43 @@
       }
     },
     {
-      "slug": "gpt-4",
-      "max_tokens": 4095,
-      "title": "GPT-4",
-      "description": "Our most advanced model, available to Plus subscribers.\n\nGPT-4 excels at tasks that require advanced reasoning, complex instruction understanding, and more creativity.",
-      "tags": [],
+      "slug": "text-davinci-002-render-sha-br",
+      "max_tokens": 8191,
+      "title": "Default (GPT-3.5) with browsing",
+      "description": "Optimized for speed and can browse the internet.",
+      "tags": [
+        "alpha"
+      ],
       "qualitative_properties": {
         "reasoning": [
-          5,
+          3,
           5
         ],
         "speed": [
-          2,
+          5,
           5
         ],
         "conciseness": [
-          4,
+          2,
           5
         ]
-      }
+      },
+      "enabled_tools": [
+        "tools"
+      ]
+    },
+    {
+      "slug": "text-davinci-002-code",
+      "max_tokens": 8195,
+      "title": "Code Interpreter",
+      "description": "An experimental model that can use Python, and handles uploads and downloads",
+      "tags": [
+        "alpha"
+      ],
+      "qualitative_properties": {},
+      "enabled_tools": [
+        "tools2"
+      ]
     }
   ]
 }
