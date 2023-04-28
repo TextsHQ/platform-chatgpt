@@ -8,7 +8,7 @@ const info: PlatformInfo = {
   version: '1.0.0',
   displayName: 'ChatGPT',
   icon,
-  loginMode: 'browser',
+  loginMode: ['browser', 'browser-extension'],
   browserLogin: {
     url: 'https://chat.openai.com/',
     runJSOnLaunch: CLOSE_ON_AUTHENTICATED_JS,
