@@ -11,6 +11,7 @@ const info: PlatformInfo = {
   loginMode: ['browser', 'browser-extension'],
   browserLogin: {
     url: 'https://chat.openai.com/',
+    cookieDomains: ['openai.com'],
     runJSOnLaunch: CLOSE_ON_AUTHENTICATED_JS,
     runJSOnNavigate: CLOSE_ON_AUTHENTICATED_JS,
     userAgent: ELECTRON_UA, // faking chrome ua will trip cf challenge
