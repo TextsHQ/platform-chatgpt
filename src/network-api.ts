@@ -190,7 +190,7 @@ export default class OpenAIAPI {
       variant_purpose: 'none',
       history_and_training_disabled: this.papi.historyAndTrainingDisabled,
     }
-    const stream = await texts.fetchStream(url, {
+    const stream = await texts.nativeFetchStream(null, url, {
       method: 'POST',
       cookieJar: this.jar,
       headers,
