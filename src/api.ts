@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { findLast } from 'lodash'
 import { CookieJar } from 'tough-cookie'
 import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, ReAuthError, ThreadFolderName, LoginCreds, ThreadID, UserID, MessageID, ClientContext } from '@textshq/platform-sdk'
 import { htmlTitleRegex, tryParseJSON } from '@textshq/platform-sdk/dist/json'
@@ -6,7 +7,7 @@ import type { IncomingMessage } from 'http'
 import type EventEmitter from 'events'
 
 import OpenAIAPI from './network-api'
-import { Plugin, Model } from './interfaces'
+import { Plugin, Model, ChatGPTConv } from './interfaces'
 import { mapMessage, mapModel, mapThread } from './mappers'
 import type PlatformInfo from './info'
 
@@ -140,32 +141,36 @@ export default class ChatGPT implements PlatformAPI {
 
   private updatedDescriptionSet = new Set<string>()
 
-  getMessages = async (threadID: string, pagination: PaginationArg): Promise<Paginated<Message>> => {
+  private updateThreadDesc = async (threadID: ThreadID, conv: ChatGPTConv, modelSlug: string) => {
+    if (!modelSlug) return texts.log('falsey modelSlug')
+    const model = (await this.modelsResPromise).models.find(m => m.slug === modelSlug)
+    const plugins = conv.plugin_ids
+      ? await Promise.all(conv.plugin_ids.map(async pid => (await this.pluginsPromise).items.find(i => i.id === pid)))
+      : undefined
+    const pluginNames = plugins?.map(p => p.manifest.name_for_human).filter(Boolean).join(', ')
+    this.pushEvent([{
+      type: ServerEventType.STATE_SYNC,
+      mutationType: 'update',
+      objectName: 'thread',
+      objectIDs: {},
+      entries: [{
+        id: threadID,
+        description: `Model: ${model?.title || ''} (${model?.slug || modelSlug})${pluginNames ? `\nEnabled plugins: ${pluginNames}` : ''}`,
+      }],
+    }])
+    this.updatedDescriptionSet.add(threadID)
+  }
+
+  getMessages = async (threadID: ThreadID, pagination: PaginationArg): Promise<Paginated<Message>> => {
     const conv = await this.api.conversation(threadID)
     if (!conv.mapping) return { items: [], hasMore: true }
     const items = Object.values(conv.mapping)
       .map(m => mapMessage(m, this.currentUser.id))
       .filter(Boolean)
-    const lastMessage = items.at(-1)
-    if (lastMessage && !this.updatedDescriptionSet.has(threadID)) {
-      const model = (await this.modelsResPromise).models.find(m => m.slug === lastMessage.extra.modelSlug)
-      if (model) {
-        const plugins = conv.plugin_ids
-          ? await Promise.all(conv.plugin_ids.map(async pid => (await this.pluginsPromise).items.find(i => i.id === pid)))
-          : undefined
-        const pluginNames = plugins?.map(p => p.manifest.name_for_human).filter(Boolean).join(', ')
-        this.pushEvent([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'update',
-          objectName: 'thread',
-          objectIDs: {},
-          entries: [{
-            id: threadID,
-            description: `Model: ${model.title} (${model.slug})${pluginNames ? `\nEnabled plugins: ${pluginNames}` : ''}`,
-          }],
-        }])
-        this.updatedDescriptionSet.add(threadID)
-      }
+    const lastMessageWithModelSlug = findLast(items, i => i.extra.modelSlug) as Message
+    if (lastMessageWithModelSlug && !this.updatedDescriptionSet.has(threadID)) {
+      if (!lastMessageWithModelSlug.extra.modelSlug) console.log('lastMessageWithModelSlug', lastMessageWithModelSlug)
+      this.updateThreadDesc(threadID, conv, lastMessageWithModelSlug.extra.modelSlug)
     }
     return {
       items,
