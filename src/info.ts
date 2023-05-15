@@ -35,6 +35,9 @@ const info: PlatformInfo = {
       default: true,
     },
   },
+  extra: {
+    dontTrimLongMessages: true,
+  },
 }
 
 export default info
