@@ -313,7 +313,7 @@ export default class ChatGPT implements PlatformAPI {
         }])
         throw Error(JSON.stringify(res))
       } else if (Array.isArray(res)) {
-        await this.postMessage({ model, conversationID: threadID, messages: res, parentMessageID })
+        await this.postMessage({ model, conversationID: threadID, messages: res.map(r => r.message), parentMessageID })
       }
     } else {
       await this.postMessage({ model, conversationID: threadID, messages: [OpenAIAPI.generateMessage(pendingMessageID, text)], parentMessageID })

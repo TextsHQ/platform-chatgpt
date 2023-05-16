@@ -79,9 +79,11 @@ export default class OpenAIAPI {
     } else if (res.body.startsWith('Internal')) {
       console.log(res.statusCode, url, res.body)
       throw Error(res.body)
+    } else if (!res.body) {
+      throw Error('falsey body')
     }
     const json = JSON.parse(res.body)
-    if (json.detail) { // potential error
+    if (json?.detail) { // potential error
       texts.error(url, json.detail)
     }
     return json as ResultType
