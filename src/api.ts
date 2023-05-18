@@ -1,8 +1,8 @@
 import { randomUUID } from 'crypto'
 import { findLast } from 'lodash'
 import { CookieJar } from 'tough-cookie'
-import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, ReAuthError, ThreadFolderName, LoginCreds, ThreadID, UserID, MessageID, ClientContext } from '@textshq/platform-sdk'
 import fs from 'fs'
+import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, ReAuthError, ThreadFolderName, LoginCreds, ThreadID, UserID, MessageID, ClientContext, Thread } from '@textshq/platform-sdk'
 import { htmlTitleRegex, tryParseJSON } from '@textshq/platform-sdk/dist/json'
 import type { IncomingMessage } from 'http'
 import type EventEmitter from 'events'
@@ -116,6 +116,12 @@ export default class ChatGPT implements PlatformAPI {
     })
     if (!threadID) throw Error('unknown')
     return this.getThread(threadID)
+  }
+
+  updateThread = async (threadID: string, updates: Partial<Thread>) => {
+    if ('title' in updates) {
+      await this.api.patchConversation(threadID, { title: updates.title })
+    }
   }
 
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
