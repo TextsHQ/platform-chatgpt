@@ -1,6 +1,5 @@
 import fs from 'fs'
 import { setTimeout } from 'timers/promises'
-import FormData from 'form-data'
 import { FetchOptions, texts } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { CookieJar } from 'tough-cookie'
@@ -120,17 +119,24 @@ export default class OpenAIAPI {
   genTitle = (convID: string, messageID: string) =>
     this.call(`backend-api/conversation/gen_title/${convID}`, { message_id: messageID }, { method: 'POST' })
 
-  uploadFile = async (convID: string, model: string, parentMessageID: string, filePath: string, fileName: string) => {
-    const body = new FormData()
-    body.append('conversation_id', convID)
-    body.append('model', model)
-    body.append('parent_message_id', parentMessageID)
-    body.append('file', await fs.promises.readFile(filePath), { filename: fileName })
-    return this.call('backend-api/conversation/upload', undefined, {
-      body,
-      method: 'POST',
+  getUploadLink = (convID: string, filename: string, fileSize: number) =>
+    this.call<{ upload_url: string }>('backend-api/conversation/get_upload_link', undefined, { method: 'POST', form: { conversation_id: convID, filename, file_size: fileSize } })
+
+  uploadFile = (uploadLink: string, filePath: string) =>
+    this.http.requestAsString(uploadLink, {
+      method: 'PUT',
+      body: fs.createReadStream(filePath),
+      headers: {
+        'x-ms-blob-type': 'BlockBlob',
+        'x-ms-version': '2020-04-08',
+      },
     })
-  }
+
+  userUploadIsComplete = (convID: string, filename: string, model: string, parentMessageID: string) =>
+    this.call<[{ conversation_id: string, error: any, message: any }] | { detail: any }>('backend-api/conversation/user_upload_is_complete', undefined, { method: 'POST', form: { conversation_id: convID, filename, model, parent_message_id: parentMessageID } })
+
+  isUploadComplete = (filename: string) =>
+    this.call<{ is_ready: boolean, retry: boolean }>('backend-api/conversation/is_upload_complete', undefined, { method: 'POST', form: { filename } })
 
   csrf = () =>
     this.call<{ csrfToken: string }>('api/auth/csrf')

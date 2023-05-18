@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import { findLast } from 'lodash'
 import { CookieJar } from 'tough-cookie'
 import { texts, PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, CurrentUser, InboxName, MessageContent, PaginationArg, MessageSendOptions, SerializedSession, ServerEventType, ActivityType, ReAuthError, ThreadFolderName, LoginCreds, ThreadID, UserID, MessageID, ClientContext } from '@textshq/platform-sdk'
+import fs from 'fs'
 import { htmlTitleRegex, tryParseJSON } from '@textshq/platform-sdk/dist/json'
 import type { IncomingMessage } from 'http'
 import type EventEmitter from 'events'
@@ -302,9 +303,22 @@ export default class ChatGPT implements PlatformAPI {
     const model = lastMessage?.message?.metadata?.model_slug || DEFAULT_MODEL
     const parentMessageID = lastMessage?.id || randomUUID()
     if (filePath) {
-      const res = await this.api.uploadFile(threadID, model, parentMessageID, filePath, fileName)
-      console.log('upload res', JSON.stringify(res, null, 2))
-      if (res.detail) {
+      userMessage.isHidden = !text // file only uploads aren't visible
+      const stat = await fs.promises.stat(filePath)
+      const { upload_url: uploadLink } = await this.api.getUploadLink(threadID, fileName, stat.size)
+      const uploadFileRes = await this.api.uploadFile(uploadLink, filePath)
+      if (uploadFileRes.statusCode !== 201) {
+        texts.error(uploadFileRes.body)
+        throw Error(`upload failed ${uploadFileRes.body}`)
+      }
+      const res = await this.api.userUploadIsComplete(threadID, fileName, model, parentMessageID)
+      texts.log('upload res', JSON.stringify(res, null, 2))
+      let uploadCompleteRes = { retry: true }
+      while (uploadCompleteRes.retry) {
+        texts.log('checking upload complete', await this.api.isUploadComplete(fileName))
+        uploadCompleteRes = await this.api.isUploadComplete(fileName)
+      }
+      if ('detail' in res) {
         this.pushEvent([{
           type: ServerEventType.USER_ACTIVITY,
           activityType: ActivityType.NONE,
