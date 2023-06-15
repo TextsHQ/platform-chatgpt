@@ -1,6 +1,6 @@
 import fs from 'fs'
 import { setTimeout } from 'timers/promises'
-import { FetchOptions, texts } from '@textshq/platform-sdk'
+import { FetchOptions, RateLimitError, texts } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { CookieJar } from 'tough-cookie'
 
@@ -68,11 +68,13 @@ export default class OpenAIAPI {
     }
     const url = `${ENDPOINT}${pathname}`
     const res = await this.http.requestAsString(url, opts)
+    if (res.statusCode === 429) throw new RateLimitError()
     if (res.body[0] === '<') {
       if (res.statusCode === 403 && !attempt) {
         await this.cfChallenge()
         return this.call<ResultType>(pathname, jsonBody, optOverrides, (attempt || 0) + 1)
       }
+      if (res.statusCode >= 400) throw Error(`${url} returned status code ${res.statusCode}`)
       console.log(res.statusCode, url, res.body)
       throw new ExpectedJSONGotHTMLError(res.statusCode, res.body)
     } else if (res.body.startsWith('Internal')) {
