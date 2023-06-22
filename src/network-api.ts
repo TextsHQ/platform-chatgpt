@@ -96,9 +96,9 @@ export default class OpenAIAPI {
     return json
   }
 
-  accountsCheck = () => this.call('backend-api/accounts/check')
+  accountsCheck = () => this.call('backend-api/accounts/check/v4-2023-04-27')
 
-  models = () => this.call('backend-api/models')
+  models = () => this.call('backend-api/models?history_and_training_disabled=' + Boolean(this.papi.historyAndTrainingDisabled))
 
   plugins = (offset = 0, limit = 20, isInstalled = true) =>
     this.call('backend-api/aip/p', undefined, { searchParams: { offset, limit, is_installed: String(isInstalled) } })

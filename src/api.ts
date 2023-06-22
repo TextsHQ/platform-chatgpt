@@ -78,7 +78,7 @@ export default class ChatGPT implements PlatformAPI {
       console.log(json)
       throw Error('no user')
     }
-    this.api.accountsCheck().then(texts.log)
+    this.api.accountsCheck().then(r => texts.log('accountsCheck', JSON.stringify(r)))
     this.modelsResPromise = this.api.models()
     this.pluginsPromise = this.api.plugins()
     this.modelsResPromise.then(res => texts.log(JSON.stringify(res, null, 2)))
