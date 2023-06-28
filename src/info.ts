@@ -9,6 +9,7 @@ const info: PlatformInfo = {
   displayName: 'ChatGPT',
   icon,
   loginMode: ['browser', 'browser-extension'],
+  autofillHostnames: ['openai.com'],
   browserLogin: {
     url: 'https://chat.openai.com/',
     cookieDomains: ['openai.com'],
