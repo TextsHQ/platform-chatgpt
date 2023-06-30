@@ -88,7 +88,6 @@ export default class ChatGPT implements PlatformAPI {
       fullName: user.name,
       email: user.email,
       imgURL: user.image,
-      displayText: user.name,
     }
     // const dist = new Date(expires).getTime() - Date.now()
     // console.log(new Date(expires), dist)
