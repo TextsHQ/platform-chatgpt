@@ -154,6 +154,7 @@ export default class OpenAIAPI {
   get headers() {
     return {
       accept: '*/*',
+      'accept-encoding': 'gzip, deflate',
       'accept-language': 'en',
       'sec-ch-ua': '"Not:A-Brand";v="99", "Chromium";v="112"',
       'sec-ch-ua-mobile': '?0',
@@ -161,6 +162,7 @@ export default class OpenAIAPI {
       'sec-fetch-dest': 'empty',
       'sec-fetch-mode': 'cors',
       'sec-fetch-site': 'same-origin',
+      'sec-gpc': '1',
       'user-agent': this.ua,
     }
   }
@@ -199,6 +201,7 @@ export default class OpenAIAPI {
       timezone_offset_min: new Date().getTimezoneOffset(),
       variant_purpose: 'none',
       history_and_training_disabled: this.papi.historyAndTrainingDisabled,
+      arkose_token: null,
     }
     const stream = await texts.nativeFetchStream(null, url, {
       method: 'POST',
