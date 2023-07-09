@@ -1,119 +1,92 @@
 {
   "models": [
     {
-      "slug": "text-davinci-002-plugins",
-      "max_tokens": 8195,
-      "title": "Plugins",
-      "description": "An experimental model that knows when and how to use plugins",
-      "tags": [
-        "alpha"
-      ],
-      "qualitative_properties": {},
-      "enabled_tools": [
-        "tools3"
-      ]
-    },
-    {
       "slug": "text-davinci-002-render-sha",
-      "max_tokens": 4097,
+      "max_tokens": 8191,
       "title": "Default (GPT-3.5)",
-      "description": "Optimized for speed, currently available to Plus users",
-      "tags": [],
-      "qualitative_properties": {
-        "reasoning": [
-          3,
-          5
-        ],
-        "speed": [
-          5,
-          5
-        ],
-        "conciseness": [
-          2,
-          5
-        ]
-      }
+      "description": "Our fastest model, great for most everyday tasks.",
+      "tags": [
+        "gpt3.5"
+      ],
+      "capabilities": {}
     },
     {
       "slug": "gpt-4",
       "max_tokens": 4095,
       "title": "GPT-4",
-      "description": "Our most advanced model, available to Plus subscribers.\n\nGPT-4 excels at tasks that require advanced reasoning, complex instruction understanding, and more creativity.",
-      "tags": [],
-      "qualitative_properties": {
-        "reasoning": [
-          5,
-          5
-        ],
-        "speed": [
-          2,
-          5
-        ],
-        "conciseness": [
-          4,
-          5
-        ]
-      }
-    },
-    {
-      "slug": "text-davinci-002-render-paid",
-      "max_tokens": 4097,
-      "title": "Legacy (GPT-3.5)",
-      "description": "The previous ChatGPT Plus model",
-      "tags": [],
-      "qualitative_properties": {
-        "reasoning": [
-          3,
-          5
-        ],
-        "speed": [
-          2,
-          5
-        ],
-        "conciseness": [
-          1,
-          5
-        ]
-      }
-    },
-    {
-      "slug": "text-davinci-002-render-sha-br",
-      "max_tokens": 8191,
-      "title": "Default (GPT-3.5) with browsing",
-      "description": "Optimized for speed and can browse the internet.",
+      "description": "Our most capable model, great for tasks that require creativity and advanced reasoning.",
       "tags": [
-        "alpha"
+        "gpt4"
       ],
-      "qualitative_properties": {
-        "reasoning": [
-          3,
-          5
-        ],
-        "speed": [
-          5,
-          5
-        ],
-        "conciseness": [
-          2,
-          5
-        ]
-      },
-      "enabled_tools": [
-        "tools"
-      ]
+      "capabilities": {}
     },
     {
-      "slug": "text-davinci-002-code",
-      "max_tokens": 8195,
+      "slug": "gpt-4-code-interpreter",
+      "max_tokens": 8192,
       "title": "Code Interpreter",
-      "description": "An experimental model that can use Python, and handles uploads and downloads",
+      "description": "An experimental model that can solve tasks by generating Python code and executing it in a Jupyter notebook.\nYou can upload any kind of file, and ask model to analyse it, or produce a new file which you can download.",
       "tags": [
-        "alpha"
+        "gpt4",
+        "beta"
       ],
-      "qualitative_properties": {},
+      "capabilities": {},
       "enabled_tools": [
         "tools2"
       ]
+    },
+    {
+      "slug": "gpt-4-plugins",
+      "max_tokens": 8192,
+      "title": "Plugins",
+      "description": "An experimental model that knows when and how to use plugins",
+      "tags": [
+        "gpt4",
+        "beta"
+      ],
+      "capabilities": {},
+      "enabled_tools": [
+        "tools3"
+      ]
+    },
+    {
+      "slug": "text-davinci-002-render-sha-mobile",
+      "max_tokens": 8191,
+      "title": "Default (GPT-3.5) (Mobile)",
+      "description": "Our fastest model, great for most everyday tasks.",
+      "tags": [
+        "mobile",
+        "gpt3.5"
+      ],
+      "capabilities": {}
+    },
+    {
+      "slug": "gpt-4-mobile",
+      "max_tokens": 4095,
+      "title": "GPT-4 (Mobile, V2)",
+      "description": "Our most capable model, great for tasks that require creativity and advanced reasoning.",
+      "tags": [
+        "mobile",
+        "gpt4"
+      ],
+      "capabilities": {}
+    }
+  ],
+  "categories": [
+    {
+      "category": "gpt_3.5",
+      "human_category_name": "GPT-3.5",
+      "subscription_level": "free",
+      "default_model": "text-davinci-002-render-sha",
+      "code_interpreter_model": "text-davinci-002-render-sha-code-interpreter",
+      "plugins_model": "text-davinci-002-render-sha-plugins"
+    },
+    {
+      "category": "gpt_4",
+      "human_category_name": "GPT-4",
+      "subscription_level": "plus",
+      "default_model": "gpt-4",
+      "code_interpreter_model": "gpt-4-code-interpreter",
+      "plugins_model": "gpt-4-plugins"
     }
   ]
 }
