@@ -3,7 +3,7 @@ import { setTimeout } from 'timers/promises'
 import { FetchOptions, RateLimitError, texts } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { CookieJar } from 'tough-cookie'
-import funcaptcha from 'funcaptcha'
+import * as funcaptcha from 'funcaptcha'
 
 import { ChatGPTConv } from './interfaces'
 import { ELECTRON_UA, CLOSE_ON_AUTHENTICATED_JS } from './constants'
