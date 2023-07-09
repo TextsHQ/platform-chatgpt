@@ -3,12 +3,16 @@ import { setTimeout } from 'timers/promises'
 import { FetchOptions, RateLimitError, texts } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { CookieJar } from 'tough-cookie'
+import funcaptcha from 'funcaptcha'
 
 import { ChatGPTConv } from './interfaces'
 import { ELECTRON_UA, CLOSE_ON_AUTHENTICATED_JS } from './constants'
 import type ChatGPT from './api'
 
 const ENDPOINT = 'https://chat.openai.com/'
+
+const ARKOSE_ENDPOINT = 'https://tcr9i.chat.openai.com'
+const ARKOSE_PUBLIC_KEY = '35536E1E-65B4-4D96-9D97-6ADB7EFF8147'
 
 export default class OpenAIAPI {
   constructor(private readonly papi: ChatGPT) { }
@@ -201,7 +205,7 @@ export default class OpenAIAPI {
       timezone_offset_min: new Date().getTimezoneOffset(),
       variant_purpose: 'none',
       history_and_training_disabled: this.papi.historyAndTrainingDisabled,
-      arkose_token: null,
+      arkose_token: model.includes('gpt-4') ? await this.getArkoseToken() : null,
     }
     const stream = await texts.nativeFetchStream(null, url, {
       method: 'POST',
@@ -210,5 +214,18 @@ export default class OpenAIAPI {
       body: JSON.stringify(body),
     })
     return stream
+  }
+
+  private async getArkoseToken(): Promise<string> {
+    const data = await funcaptcha.getToken({
+      pkey: ARKOSE_PUBLIC_KEY,
+      surl: ARKOSE_ENDPOINT,
+      headers: {
+        'User-Agent': this.ua,
+      },
+      site: ENDPOINT,
+    })
+
+    return data.token
   }
 }
