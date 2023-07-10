@@ -1729,13 +1729,23 @@ __metadata:
     "@types/tough-cookie": ^4.0.2
     eslint: ^8.40.0
     form-data: ^4.0.0
-    funcaptcha: ^1.0.37
+    funcaptcha: "https://github.com/TextsHQ/funcaptcha"
     lodash: ^4.17.21
     react: "https://github.com/TextsHQ/react-global-shim#main"
     tough-cookie: ^4.1.2
     typescript: ^5.0.4
   languageName: unknown
   linkType: soft
+
+"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk":
+  version: 0.4.4
+  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=8a625558055baa77d6e5ce5f4f2c3d02312fac2a"
+  dependencies:
+    emoji-regex: ^10.1.0
+    qrcode.react: ^3.1.0
+  checksum: f93ba504bfbedfdb80034b0fc60addf53f6149e411ecb2905a2fce5e1963c7e57b10aa6ed6c058a215ae416b3b7eaa69df007520c9624a5bde898b2b0ddf7131
+  languageName: node
+  linkType: hard
 
 "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#b94072363117f15e8a6b0db66c003a9a5b81a671":
   version: 0.4.4
@@ -1798,6 +1808,13 @@ __metadata:
   version: 4.14.194
   resolution: "@types/lodash@npm:4.14.194"
   checksum: 113f34831c461469d91feca2dde737f88487732898b4d25e9eb23b087bb193985f864d1e1e0f3b777edc5022e460443588b6000a3b2348c966f72d17eedc35ea
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:^18.16.19":
+  version: 18.16.19
+  resolution: "@types/node@npm:18.16.19"
+  checksum: 63c31f09616508aa7135380a4c79470a897b75f9ff3a70eb069e534dfabdec3f32fb0f9df5939127f1086614d980ddea0fa5e8cc29a49103c4f74cd687618aaf
   languageName: node
   linkType: hard
 
@@ -2254,15 +2271,6 @@ __metadata:
   bin:
     browserslist: cli.js
   checksum: 4af3793704dbb4615bcd29059ab472344dc7961c8680aa6c4bb84f05340e14038d06a5aead58724eae69455b8fade8b8c69f1638016e87e5578969d74c078b79
-  languageName: node
-  linkType: hard
-
-"busboy@npm:^1.6.0":
-  version: 1.6.0
-  resolution: "busboy@npm:1.6.0"
-  dependencies:
-    streamsearch: ^1.1.0
-  checksum: 32801e2c0164e12106bf236291a00795c3c4e4b709ae02132883fe8478ba2ae23743b11c5735a0aae8afe65ac4b6ca4568b91f0d9fed1fdbc32ede824a73746e
   languageName: node
   linkType: hard
 
@@ -3186,12 +3194,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"funcaptcha@npm:^1.0.37":
+"funcaptcha@https://github.com/TextsHQ/funcaptcha":
   version: 1.0.37
-  resolution: "funcaptcha@npm:1.0.37"
+  resolution: "funcaptcha@https://github.com/TextsHQ/funcaptcha.git#commit=52c72a33d3f6420c5eed1093f8fa99f273dc404f"
   dependencies:
-    undici: ^5.22.0
-  checksum: 5358ec8ccaf2fde6f410cae55ae6fdf012fe12154ae80f40897901db97c2ff121e402c729a2feebe3b53e0066ac2193ab4aa8c4091fc60b40f832eeeb685abe6
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk"
+    "@types/node": ^18.16.19
+    typescript: ^5.1.6
+  checksum: 53a677a8039b6ec8b2887c7e2c406e103c21057973261777a9b33e0ecbc35237b81cd30e755fdb54abfa48e6eed5c064beaa3170d33ddccecaa410d4909f8776
   languageName: node
   linkType: hard
 
@@ -4432,13 +4442,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"streamsearch@npm:^1.1.0":
-  version: 1.1.0
-  resolution: "streamsearch@npm:1.1.0"
-  checksum: 1cce16cea8405d7a233d32ca5e00a00169cc0e19fbc02aa839959985f267335d435c07f96e5e0edd0eadc6d39c98d5435fb5bbbdefc62c41834eadc5622ad942
-  languageName: node
-  linkType: hard
-
 "string-natural-compare@npm:^3.0.1":
   version: 3.0.1
   resolution: "string-natural-compare@npm:3.0.1"
@@ -4643,6 +4646,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"typescript@npm:^5.1.6":
+  version: 5.1.6
+  resolution: "typescript@npm:5.1.6"
+  bin:
+    tsc: bin/tsc
+    tsserver: bin/tsserver
+  checksum: b2f2c35096035fe1f5facd1e38922ccb8558996331405eb00a5111cc948b2e733163cc22fab5db46992aba7dd520fff637f2c1df4996ff0e134e77d3249a7350
+  languageName: node
+  linkType: hard
+
 "typescript@patch:typescript@^5.0.4#~builtin<compat/typescript>":
   version: 5.0.4
   resolution: "typescript@patch:typescript@npm%3A5.0.4#~builtin<compat/typescript>::version=5.0.4&hash=85af82"
@@ -4650,6 +4663,16 @@ __metadata:
     tsc: bin/tsc
     tsserver: bin/tsserver
   checksum: bb309d320c59a26565fb3793dba550576ab861018ff3fd1b7fccabbe46ae4a35546bc45f342c0a0b6f265c801ccdf64ffd68f548f117ceb7f0eac4b805cd52a9
+  languageName: node
+  linkType: hard
+
+"typescript@patch:typescript@^5.1.6#~builtin<compat/typescript>":
+  version: 5.1.6
+  resolution: "typescript@patch:typescript@npm%3A5.1.6#~builtin<compat/typescript>::version=5.1.6&hash=85af82"
+  bin:
+    tsc: bin/tsc
+    tsserver: bin/tsserver
+  checksum: 21e88b0a0c0226f9cb9fd25b9626fb05b4c0f3fddac521844a13e1f30beb8f14e90bd409a9ac43c812c5946d714d6e0dee12d5d02dfc1c562c5aacfa1f49b606
   languageName: node
   linkType: hard
 
@@ -4662,15 +4685,6 @@ __metadata:
     has-symbols: ^1.0.3
     which-boxed-primitive: ^1.0.2
   checksum: b7a1cf5862b5e4b5deb091672ffa579aa274f648410009c81cca63fed3b62b610c4f3b773f912ce545bb4e31edc3138975b5bc777fc6e4817dca51affb6380e9
-  languageName: node
-  linkType: hard
-
-"undici@npm:^5.22.0":
-  version: 5.22.1
-  resolution: "undici@npm:5.22.1"
-  dependencies:
-    busboy: ^1.6.0
-  checksum: 048a3365f622be44fb319316cedfaa241c59cf7f3368ae7667a12323447e1822e8cc3d00f6956c852d1478a6fde1cbbe753f49e05f2fdaed229693e716ebaf35
   languageName: node
   linkType: hard
 

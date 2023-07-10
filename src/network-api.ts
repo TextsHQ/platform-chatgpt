@@ -217,7 +217,7 @@ export default class OpenAIAPI {
   }
 
   private async getArkoseToken(): Promise<string> {
-    const data = await funcaptcha.getToken({
+    const data = await funcaptcha.generateRequest({
       pkey: ARKOSE_PUBLIC_KEY,
       surl: ARKOSE_ENDPOINT,
       headers: {
@@ -226,6 +226,13 @@ export default class OpenAIAPI {
       site: ENDPOINT,
     })
 
-    return data.token
+    const req = await this.http.requestAsString(data.url, {
+      method: 'POST',
+      headers: data.headers,
+      body: data.body,
+    })
+    console.log(req.statusCode, req.body, data)
+    const json = JSON.parse(req.body)
+    return json.token
   }
 }
