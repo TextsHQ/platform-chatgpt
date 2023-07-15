@@ -1,19 +1,23 @@
 import fs from 'fs'
 import { setTimeout } from 'timers/promises'
-import FormData from 'form-data'
-import { FetchOptions, texts } from '@textshq/platform-sdk'
+import { FetchOptions, RateLimitError, texts } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { CookieJar } from 'tough-cookie'
+import * as funcaptcha from 'funcaptcha'
 
 import { ChatGPTConv } from './interfaces'
 import { ELECTRON_UA, CLOSE_ON_AUTHENTICATED_JS } from './constants'
+import type ChatGPT from './api'
 
 const ENDPOINT = 'https://chat.openai.com/'
 
-export default class OpenAIAPI {
-  private http = texts.createHttpClient()
+const ARKOSE_ENDPOINT = 'https://tcr9i.chat.openai.com'
+const ARKOSE_PUBLIC_KEY = '35536E1E-65B4-4D96-9D97-6ADB7EFF8147'
 
-  constructor(private readonly accountID: string) {}
+export default class OpenAIAPI {
+  constructor(private readonly papi: ChatGPT) { }
+
+  private http = texts.createHttpClient()
 
   jar: CookieJar
 
@@ -31,13 +35,14 @@ export default class OpenAIAPI {
     console.time('cf challenge')
     try {
       // todo: add timeout or this will never resolve
-      const result = await texts.openBrowserWindow(this.accountID, {
+      const result = await texts.openBrowserWindow(this.papi.accountID, {
         url: ENDPOINT,
         cookieJar: this.jar.toJSON(),
         userAgent: ELECTRON_UA,
         runJSOnLaunch: CLOSE_ON_AUTHENTICATED_JS,
         runJSOnNavigate: CLOSE_ON_AUTHENTICATED_JS,
       })
+      if (!result.cookieJar) return
       this.ua = ELECTRON_UA
       const cj = CookieJar.fromJSON(result.cookieJar as any)
       this.jar = cj
@@ -67,19 +72,23 @@ export default class OpenAIAPI {
     }
     const url = `${ENDPOINT}${pathname}`
     const res = await this.http.requestAsString(url, opts)
+    if (res.statusCode === 429) throw new RateLimitError()
     if (res.body[0] === '<') {
       if (res.statusCode === 403 && !attempt) {
         await this.cfChallenge()
         return this.call<ResultType>(pathname, jsonBody, optOverrides, (attempt || 0) + 1)
       }
+      if (res.statusCode >= 400) throw Error(`${url} returned status code ${res.statusCode}`)
       console.log(res.statusCode, url, res.body)
       throw new ExpectedJSONGotHTMLError(res.statusCode, res.body)
     } else if (res.body.startsWith('Internal')) {
       console.log(res.statusCode, url, res.body)
       throw Error(res.body)
+    } else if (!res.body) {
+      throw Error('falsey body')
     }
     const json = JSON.parse(res.body)
-    if (json.detail) { // potential error
+    if (json?.detail) { // potential error
       texts.error(url, json.detail)
     }
     return json as ResultType
@@ -91,9 +100,9 @@ export default class OpenAIAPI {
     return json
   }
 
-  accountsCheck = () => this.call('backend-api/accounts/check')
+  accountsCheck = () => this.call('backend-api/accounts/check/v4-2023-04-27')
 
-  models = () => this.call('backend-api/models')
+  models = () => this.call('backend-api/models?history_and_training_disabled=' + Boolean(this.papi.historyAndTrainingDisabled))
 
   plugins = (offset = 0, limit = 20, isInstalled = true) =>
     this.call('backend-api/aip/p', undefined, { searchParams: { offset, limit, is_installed: String(isInstalled) } })
@@ -116,17 +125,24 @@ export default class OpenAIAPI {
   genTitle = (convID: string, messageID: string) =>
     this.call(`backend-api/conversation/gen_title/${convID}`, { message_id: messageID }, { method: 'POST' })
 
-  uploadFile = async (convID: string, model: string, parentMessageID: string, filePath: string, fileName: string) => {
-    const body = new FormData()
-    body.append('conversation_id', convID)
-    body.append('model', model)
-    body.append('parent_message_id', parentMessageID)
-    body.append('file', await fs.promises.readFile(filePath), { filename: fileName })
-    return this.call('backend-api/conversation/upload', undefined, {
-      body,
-      method: 'POST',
+  getUploadLink = (convID: string, filename: string, fileSize: number) =>
+    this.call<{ upload_url: string }>('backend-api/conversation/get_upload_link', undefined, { method: 'POST', form: { conversation_id: convID, filename, file_size: fileSize } })
+
+  uploadFile = (uploadLink: string, filePath: string) =>
+    this.http.requestAsString(uploadLink, {
+      method: 'PUT',
+      body: fs.createReadStream(filePath),
+      headers: {
+        'x-ms-blob-type': 'BlockBlob',
+        'x-ms-version': '2020-04-08',
+      },
     })
-  }
+
+  userUploadIsComplete = (convID: string, filename: string, model: string, parentMessageID: string) =>
+    this.call<[{ conversation_id: string, error: any, message: any }] | { detail: any }>('backend-api/conversation/user_upload_is_complete', undefined, { method: 'POST', form: { conversation_id: convID, filename, model, parent_message_id: parentMessageID } })
+
+  isUploadComplete = (filename: string) =>
+    this.call<{ is_ready: boolean, retry: boolean }>('backend-api/conversation/is_upload_complete', undefined, { method: 'POST', form: { filename } })
 
   csrf = () =>
     this.call<{ csrfToken: string }>('api/auth/csrf')
@@ -156,7 +172,7 @@ export default class OpenAIAPI {
 
     return {
       accept: '*/*',
-      'accept-encoding': 'gzip,deflate,br',
+      'accept-encoding': 'gzip, deflate',
       'accept-language': 'en',
       'sec-ch-ua': '"Not:A-Brand";v="99", "Chromium";v="112"',
       'sec-ch-ua-mobile': '?0',
@@ -169,11 +185,17 @@ export default class OpenAIAPI {
     }
   }
 
-  async postMessage({ model, conversationID, guid, text, pluginIDs, parentMessageID }: {
+  static generateMessage = (guid: string, text: string) => ({
+    id: guid,
+    author: { role: 'user' },
+    role: 'user',
+    content: { content_type: 'text', parts: [text] },
+  })
+
+  async postMessage({ model, conversationID, messages, pluginIDs, parentMessageID }: {
     model: string
     conversationID: string | undefined
-    guid: string
-    text: string
+    messages: any[]
     pluginIDs?: string[]
     parentMessageID: string
   }) {
@@ -189,24 +211,42 @@ export default class OpenAIAPI {
     }
     const body = {
       action: 'next',
-      messages: [{
-        id: guid,
-        author: { role: 'user' },
-        role: 'user',
-        content: { content_type: 'text', parts: [text] },
-      }],
+      messages,
       conversation_id: conversationID,
       parent_message_id: parentMessageID,
       model,
       plugin_ids: pluginIDs,
       timezone_offset_min: new Date().getTimezoneOffset(),
+      variant_purpose: 'none',
+      history_and_training_disabled: this.papi.historyAndTrainingDisabled,
+      arkose_token: model.includes('gpt-4') ? await this.getArkoseToken() : null,
     }
-    const stream = await texts.fetchStream(url, {
+    const stream = await texts.nativeFetchStream(null, url, {
       method: 'POST',
       cookieJar: this.jar,
       headers,
       body: JSON.stringify(body),
     })
     return stream
+  }
+
+  private async getArkoseToken(): Promise<string> {
+    const data = await funcaptcha.generateRequest({
+      pkey: ARKOSE_PUBLIC_KEY,
+      surl: ARKOSE_ENDPOINT,
+      headers: {
+        'User-Agent': this.ua,
+      },
+      site: ENDPOINT,
+    })
+
+    const req = await this.http.requestAsString(data.url, {
+      method: 'POST',
+      headers: data.headers,
+      body: data.body,
+    })
+    console.log(req.statusCode, req.body, data)
+    const json = JSON.parse(req.body)
+    return json.token
   }
 }

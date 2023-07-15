@@ -8,9 +8,11 @@ const info: PlatformInfo = {
   version: '1.0.0',
   displayName: 'ChatGPT',
   icon,
-  loginMode: 'browser',
+  loginMode: ['browser', 'browser-extension'],
+  autofillHostnames: ['openai.com'],
   browserLogin: {
     url: 'https://chat.openai.com/',
+    cookieDomains: ['openai.com'],
     runJSOnLaunch: CLOSE_ON_AUTHENTICATED_JS,
     runJSOnNavigate: CLOSE_ON_AUTHENTICATED_JS,
     userAgent: ELECTRON_UA, // faking chrome ua will trip cf challenge
@@ -25,6 +27,17 @@ const info: PlatformInfo = {
   ]),
   attachments: {
     noSupport: true,
+  },
+  prefs: {
+    history_and_training_disabled: {
+      label: 'Chat History & Training',
+      description: 'Save new chats to your history and allow them to be used to improve ChatGPT via model training. Unsaved chats will be deleted from OpenAI systems within 30 days.',
+      type: 'checkbox',
+      default: true,
+    },
+  },
+  extra: {
+    dontTrimLongMessages: true,
   },
 }
 
